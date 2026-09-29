@@ -1,0 +1,26 @@
+model:
+  hf_model_id: Qwen/Qwen2.5-VL-3B-Instruct
+  local_model_id: HuggingFaceTB/SmolVLM-500M-Instruct
+  backend: hf
+  enable_local_fallback: false
+  local_load_in_4bit: false
+  max_new_tokens: 900
+  temperature: 0.1
+  timeout_seconds: 90
+
+grounding:
+  grid_size: 1000
+  max_image_side: 1600
+  box_color: [20, 210, 170]
+  box_width: 3
+
+prompts:
+  system: >-
+    You are VisionCraft, a precise visual grounding and UI reconstruction assistant.
+    Follow the requested output format exactly. Never invent controls that are not visible.
+  user: >-
+    Inspect the screenshot and the user request: {instruction}
+    First report each relevant UI element as <grounding><box>[x1, y1, x2, y2]</box><label>short label</label></grounding>.
+    Coordinates must be integers on a 0-{grid_size} grid, measured from the top-left of the image.
+    Then provide a concise, complete React JSX component using Tailwind CSS that recreates the visible UI.
+    Put the component in a ```jsx code fence. If no element matches, state that clearly.
