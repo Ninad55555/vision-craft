@@ -1,0 +1,12 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+out*.html
+tests/eval_images/_edge_profile/
+*.egg-info/
+.coverage
+htmlcov/
+.DS_Store
