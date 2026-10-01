@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VisionCraft — screenshot to standalone HTML</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="app-header">
+  <div>
+    <h1>VisionCraft</h1>
+    <p class="tagline">Screenshot in, single self-contained <code>.html</code> out — a first draft, not pixel-perfect.</p>
+  </div>
+  <div class="model-badge" id="model-badge" title="Model configured on the server">…</div>
+</header>
+
+<div class="access-banner" id="access-banner" hidden>
+  <label for="access-key">This server requires an access key:</label>
+  <input type="password" id="access-key" autocomplete="off" placeholder="Paste access key">
+  <button type="button" id="access-save">Save</button>
+</div>
+
+<main class="layout">
+  <section class="panel input-panel" aria-label="Screenshot input">
+    <div class="dropzone" id="dropzone" tabindex="0" role="button"
+         aria-label="Upload a screenshot: click to choose, drag and drop, or paste from clipboard">
+      <p class="dz-title">Drop a screenshot here</p>
+      <p class="dz-sub">or <span class="dz-link">choose a file</span>, or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></p>
+      <p class="dz-formats" id="dz-formats">PNG · JPG · WebP</p>
+      <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
+    </div>
+    <p class="field-error" id="file-error" role="alert" hidden></p>
+
+    <div class="thumb-wrap" id="thumb-wrap" hidden>
+      <img id="thumb" alt="Uploaded screenshot thumbnail">
+      <div class="thumb-meta" id="thumb-meta"></div>
+      <button type="button" class="link-btn" id="remove-image">Remove</button>
+    </div>
+
+    <label class="field-label" for="instructions">Instructions <span class="opt">(optional)</span></label>
+    <textarea id="instructions" rows="3" maxlength="1000"
+      placeholder="e.g. make it dark mode, keep only the hero section"></textarea>
+
+    <div class="actions">
+      <button type="button" class="btn primary" id="generate" disabled>Generate</button>
+      <button type="button" class="btn" id="cancel" disabled>Cancel</button>
+    </div>
+
+    <div class="status" id="status" aria-live="polite">Pick a screenshot to begin.</div>
+    <div class="progress" id="progress" hidden>
+      <span id="progress-stage">Preparing</span>
+      <span class="dot">·</span><span id="progress-time">0.0 s</span>
+      <span class="dot">·</span><span id="progress-tokens">≈ 0 tokens</span>
+    </div>
+  </section>
+
+  <section class="panel output-panel" aria-label="Generated output">
+    <div class="tabbar" role="tablist" aria-label="Output views">
+      <button type="button" role="tab" aria-selected="true" id="tab-preview" data-view="preview">Preview</button>
+      <button type="button" role="tab" aria-selected="false" id="tab-code" data-view="code">Code</button>
+      <button type="button" role="tab" aria-selected="false" id="tab-compare" data-view="compare"
+              disabled title="Compare view is coming soon (P1)">Compare · soon</button>
+      <div class="device-toggle" role="group" aria-label="Preview width">
+        <button type="button" data-device="fit" aria-pressed="true">Fit</button>
+        <button type="button" data-device="768" aria-pressed="false">768</button>
+        <button type="button" data-device="390" aria-pressed="false">390</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button type="button" class="btn" id="copy" disabled>Copy</button>
+      <button type="button" class="btn" id="download" disabled>Download</button>
+      <button type="button" class="btn" id="regenerate" disabled>Regenerate</button>
+    </div>
+
+    <div class="warnings" id="warnings" hidden></div>
+
+    <div class="preview-wrap" id="preview-wrap" data-device="fit">
+      <div class="preview-empty" id="preview-empty">The generated page will render here, sandboxed.</div>
+      <iframe id="preview" title="Generated page preview"
+              sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
+    </div>
+
+    <div class="code-wrap" id="code-wrap" hidden>
+      <div class="code-meta" id="code-meta"></div>
+      <pre><code id="code"></code></pre>
+    </div>
+
+    <div class="result-meta" id="result-meta" hidden></div>
+
+    <div class="error-box" id="error-box" role="alert" hidden>
+      <p id="error-msg"></p>
+      <button type="button" class="btn" id="retry" hidden>Retry</button>
+    </div>
+  </section>
+</main>
+
+<footer class="app-footer">
+  <p>Output is a first draft: expect approximated spacing, system fonts, and placeholder images. Review generated code before using it.</p>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

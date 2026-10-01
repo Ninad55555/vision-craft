@@ -1,0 +1,1 @@
+D Design Team 4 online Today Mara 9:41 Morning! The onboarding flow is ready for review Jon 9:44 Nice — checking the empty states now I pushed the new illustrations last night Mara 9:47 These are great. Ship it? One more pass on the error copy, then yes Jon 9:52 +1. Also the loading skeleton flickers on slow 4G Good catch — I will file that as a separate ticket Message

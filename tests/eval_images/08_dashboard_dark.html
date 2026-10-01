@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Pulseboard</title><style>
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+
+  body { background:#0a0f1e; color:#e2e8f0; }
+  .app { display:flex; min-height:100vh; }
+  aside { width:220px; background:#0d1428; padding:22px 0; border-right:1px solid #1e293b; }
+  aside .logo { padding:0 22px 22px; font-weight:800; color:#a78bfa; }
+  aside li { list-style:none; padding:10px 22px; font-size:14px; color:#94a3b8; }
+  aside li.on { background:#1e1b4b; color:#c4b5fd; border-right:3px solid #a78bfa; }
+  main { flex:1; padding:26px 32px; }
+  main h1 { font-size:22px; margin-bottom:20px; }
+  .row { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:16px; }
+  .card { background:#111a30; border:1px solid #1e293b; border-radius:10px; padding:18px 20px; }
+  .card span { font-size:12px; color:#94a3b8; text-transform:uppercase; }
+  .card b { display:block; font-size:26px; margin-top:6px; }
+  .card i { font-style:normal; font-size:12px; color:#4ade80; }
+  .wide { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .spark { display:flex; align-items:flex-end; gap:6px; height:80px; margin-top:12px; }
+  .spark div { flex:1; background:#7c3aed; border-radius:2px; }
+  table { width:100%; font-size:13px; border-collapse:collapse; margin-top:10px; }
+  td, th { text-align:left; padding:9px 4px; border-bottom:1px solid #1e293b; color:#cbd5e1; }
+  th { color:#64748b; font-size:11px; text-transform:uppercase; }
+  .pill { background:#052e16; color:#4ade80; border-radius:999px; padding:2px 10px; font-size:11px; }
+  .pill.warn { background:#451a03; color:#fb923c; }
+</style></head><body><div class="app">
+<aside><div class="logo">&#9835; Pulseboard</div><ul><li class="on">Live view</li><li>Alerts</li><li>Services</li><li>Deployments</li><li>Settings</li></ul></aside>
+<main><h1>Live view <span style="font-size:13px;color:#4ade80">&#9679; all systems normal</span></h1>
+<div class="row"><div class="card"><span>Requests / min</span><b>48,201</b><i>&#9650; 3.2%</i><div class="spark"><div style="height:40%"></div><div style="height:65%"></div><div style="height:50%"></div><div style="height:80%"></div><div style="height:62%"></div><div style="height:90%"></div><div style="height:70%"></div></div></div>
+<div class="card"><span>Error rate</span><b>0.04%</b><i>&#9660; 0.01%</i><div class="spark"><div style="height:20%"></div><div style="height:30%"></div><div style="height:18%"></div><div style="height:42%"></div><div style="height:25%"></div><div style="height:35%"></div><div style="height:22%"></div></div></div>
+<div class="card"><span>p99 latency</span><b>212 ms</b><i>&#9650; 8 ms</i><div class="spark"><div style="height:55%"></div><div style="height:48%"></div><div style="height:60%"></div><div style="height:52%"></div><div style="height:70%"></div><div style="height:58%"></div><div style="height:64%"></div></div></div></div>
+<div class="wide"><div class="card"><span>Recent deploys</span><table><tr><th>Service</th><th>Version</th><th>Status</th></tr><tr><td>checkout-api</td><td>v2.14.1</td><td><span class="pill">healthy</span></td></tr><tr><td>search-indexer</td><td>v1.9.0</td><td><span class="pill">healthy</span></td></tr><tr><td>billing-worker</td><td>v3.2.2</td><td><span class="pill warn">degraded</span></td></tr></table></div>
+<div class="card"><span>Top endpoints</span><table><tr><th>Route</th><th>RPM</th></tr><tr><td>POST /v1/orders</td><td>12,400</td></tr><tr><td>GET /v1/search</td><td>9,830</td></tr><tr><td>GET /v1/users/me</td><td>7,112</td></tr></table></div></div>
+</main></div></body></html>

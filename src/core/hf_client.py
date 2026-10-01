@@ -1,114 +1,247 @@
-"""Hugging Face Inference API adapter with optional local fallback."""
-
 from __future__ import annotations
 
-import base64
-import io
-import os
-import time
-from typing import Any
+import asyncio
+from dataclasses import dataclass
+from typing import Any, AsyncIterator, Literal
 
-from PIL import Image
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+)
 
-from src.core.local_vlm import LocalVLM
+from src.core.errors import VisionCraftError, error
+
+StreamKind = Literal["status", "delta", "done"]
+
+RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
 
 
-class InferenceError(RuntimeError):
-    """Raised when remote and configured local inference both fail."""
+@dataclass
+class StreamEvent:
+    kind: StreamKind
+    text: str = ""
+    model: str = ""
+    finish_reason: str | None = None
+    usage: dict | None = None
+    note: str = ""
 
 
-class VisionCraftClient:
-    """Run multimodal chat against HF Serverless Inference or local Transformers."""
+class _Fallback(Exception):
+    """Move on to the next model (or retry same model without stream_options)."""
 
-    def __init__(self, config: dict[str, Any], token: str | None = None) -> None:
-        model_config = config.get("model", {})
-        self.model_id = os.getenv("HF_MODEL_ID", model_config.get("hf_model_id", "Qwen/Qwen2.5-VL-3B-Instruct"))
-        self.token = token or os.getenv("HF_TOKEN")
-        self.timeout = float(os.getenv("VISIONCRAFT_TIMEOUT", model_config.get("timeout_seconds", 90)))
-        self.max_new_tokens = int(model_config.get("max_new_tokens", 900))
-        self.temperature = float(model_config.get("temperature", 0.1))
-        self.enable_local_fallback = _env_bool(
-            "VISIONCRAFT_ENABLE_LOCAL_FALLBACK", model_config.get("enable_local_fallback", False)
+    def __init__(self, retry_same_model: bool = False):
+        super().__init__()
+        self.retry_same_model = retry_same_model
+
+
+class _Retry(Exception):
+    def __init__(self, delay_seconds: float):
+        super().__init__()
+        self.delay_seconds = delay_seconds
+
+
+def _exc_message(exc: BaseException) -> str:
+    return str(exc)[:500]
+
+
+def _exc_status(exc: BaseException) -> int | None:
+    return getattr(exc, "status_code", None)
+
+
+def _retry_after_seconds(exc: BaseException) -> float | None:
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if not headers:
+        return None
+    try:
+        value = headers.get("retry-after")
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _usage_dict(usage: Any) -> dict | None:
+    if usage is None:
+        return None
+    if isinstance(usage, dict):
+        return {
+            "prompt_tokens": usage.get("prompt_tokens"),
+            "completion_tokens": usage.get("completion_tokens"),
+        }
+    prompt = getattr(usage, "prompt_tokens", None)
+    completion = getattr(usage, "completion_tokens", None)
+    if prompt is None and completion is None:
+        return None
+    return {"prompt_tokens": prompt, "completion_tokens": completion}
+
+
+def _is_credit_error(status: int | None, message: str) -> bool:
+    if status == 402:
+        return True
+    low = message.lower()
+    return ("credit" in low and ("exhaust" in low or "deplet" in low or "insufficient" in low)) or (
+        "exceeded your monthly" in low
+    )
+
+
+def _is_unsupported_model(status: int | None, message: str) -> bool:
+    if status == 404:
+        return True
+    if status != 400:
+        return False
+    low = message.lower()
+    return "model" in low and ("not supported" in low or "not found" in low)
+
+
+def _is_stream_options_rejection(status: int | None, message: str) -> bool:
+    return status == 400 and "stream_option" in message.lower()
+
+
+def _backoff(attempt: int) -> float:
+    return 1.5 * (2**attempt)
+
+
+class VLMClient:
+    def __init__(self, *, settings_obj=None, client: AsyncOpenAI | None = None):
+        from app.settings import settings as default_settings
+
+        self.settings = settings_obj or default_settings
+        self._client = client or AsyncOpenAI(
+            base_url=self.settings.hf_base_url,
+            api_key=self.settings.hf_token,
+            timeout=self.settings.request_timeout_seconds,
+            max_retries=0,
         )
-        self.local_model_id = os.getenv("VISIONCRAFT_LOCAL_MODEL_ID", model_config.get("local_model_id", "HuggingFaceTB/SmolVLM-500M-Instruct"))
-        self.local_load_in_4bit = _env_bool("VISIONCRAFT_LOCAL_4BIT", model_config.get("local_load_in_4bit", False))
-        self._client: Any = None
-        self._local: LocalVLM | None = None
 
-    def generate(self, image: Image.Image, system_prompt: str, user_prompt: str) -> str:
-        """Generate a single response using an image and text prompt."""
-        if not self.token:
-            if self.enable_local_fallback:
-                return self._run_local(image, system_prompt, user_prompt)
-            raise InferenceError("HF_TOKEN is required for remote inference; configure local fallback to run offline.")
+    async def aclose(self) -> None:
+        await self._client.close()
 
-        image_data_url = _image_data_url(image)
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": user_prompt},
-                    {"type": "image_url", "image_url": {"url": image_data_url}},
-                ],
-            },
-        ]
-        try:
-            return self._generate_remote(messages)
-        except Exception as exc:
-            if self.enable_local_fallback:
+    async def stream(self, messages: list[dict]) -> AsyncIterator[StreamEvent]:
+        """Yield status/delta/done events across the primary + fallback models."""
+        if not self.settings.hf_token:
+            raise error("AUTH_MISSING", "Server has no HF_TOKEN set. Add it to .env and restart.")
+
+        models = [self.settings.hf_model_id, *self.settings.fallback_models]
+        tried: list[str] = []
+
+        for index, model in enumerate(models):
+            tried.append(model)
+            note = f"Falling back to {model}" if index > 0 else ""
+            yield StreamEvent(kind="status", text="calling_model", model=model, note=note)
+
+            attempt = 0
+            use_stream_options = True
+            while True:
                 try:
-                    return self._run_local(image, system_prompt, user_prompt)
-                except Exception as local_exc:
-                    raise InferenceError(f"Hugging Face inference failed ({exc}); local fallback failed ({local_exc}).") from local_exc
-            raise InferenceError(f"Hugging Face inference failed: {exc}") from exc
+                    async for event in self._stream_once(model, messages, use_stream_options, attempt):
+                        if event.kind == "done" and note:
+                            event.note = note
+                        yield event
+                    return
+                except _Fallback as hop:
+                    if hop.retry_same_model:
+                        use_stream_options = False
+                        continue
+                    break  # next model
+                except _Retry as later:
+                    attempt += 1
+                    await asyncio.sleep(later.delay_seconds)
+                    continue
 
-    def _generate_remote(self, messages: list[dict[str, Any]]) -> str:
-        """Call the serverless endpoint with a small retry budget for transient failures."""
-        if self._client is None:
+        raise error(
+            "MODEL_UNAVAILABLE",
+            "None of the configured models is available: "
+            + ", ".join(tried)
+            + ". Run scripts/list_models.py to pick one that is live today.",
+        )
+
+    async def _stream_once(
+        self, model: str, messages: list[dict], use_stream_options: bool, attempt: int
+    ) -> AsyncIterator[StreamEvent]:
+        """One attempt against one model. Raises _Retry, _Fallback, or VisionCraftError."""
+        max_retries = max(0, self.settings.max_retries)
+        request: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": self.settings.max_output_tokens,
+            "temperature": self.settings.temperature,
+            "stream": True,
+        }
+        if use_stream_options:
+            request["stream_options"] = {"include_usage": True}
+
+        emitted_delta = False
+        try:
+            response = await self._client.chat.completions.create(**request)
+            finish_reason: str | None = None
+            usage: dict | None = None
             try:
-                from huggingface_hub import InferenceClient
-            except ImportError as exc:
-                raise InferenceError("Install requirements.txt to use Hugging Face inference.") from exc
-            self._client = InferenceClient(model=self.model_id, token=self.token, timeout=self.timeout)
-
-        last_error: Exception | None = None
-        for attempt in range(3):
-            try:
-                response = self._client.chat_completion(
-                    messages=messages,
-                    max_tokens=self.max_new_tokens,
-                    temperature=self.temperature,
-                )
-                content = response.choices[0].message.content
-                if isinstance(content, list):
-                    return "\n".join(str(part.get("text", "")) for part in content if isinstance(part, dict))
-                if not isinstance(content, str) or not content.strip():
-                    raise InferenceError("The inference endpoint returned an empty response.")
-                return content
-            except Exception as exc:
-                last_error = exc
-                status = getattr(getattr(exc, "response", None), "status_code", None)
-                if attempt == 2 or status not in {None, 408, 429, 500, 502, 503, 504}:
-                    raise
-                time.sleep(0.75 * (attempt + 1))
-        raise InferenceError(f"Inference retries exhausted: {last_error}")
-
-    def _run_local(self, image: Image.Image, system_prompt: str, user_prompt: str) -> str:
-        if self._local is None:
-            self._local = LocalVLM(self.local_model_id, load_in_4bit=self.local_load_in_4bit)
-        return self._local.generate(image, system_prompt, user_prompt, self.max_new_tokens, self.temperature)
-
-
-def _image_data_url(image: Image.Image) -> str:
-    image_buffer = io.BytesIO()
-    image.convert("RGB").save(image_buffer, format="JPEG", quality=90)
-    encoded = base64.b64encode(image_buffer.getvalue()).decode("ascii")
-    return f"data:image/jpeg;base64,{encoded}"
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return bool(default)
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+                async for chunk in response:
+                    chunk_usage = getattr(chunk, "usage", None)
+                    if chunk_usage:
+                        usage = _usage_dict(chunk_usage)
+                    choices = getattr(chunk, "choices", None) or []
+                    if not choices:
+                        continue
+                    choice = choices[0]
+                    delta = getattr(choice.delta, "content", None) if choice.delta else None
+                    if delta:
+                        emitted_delta = True
+                        yield StreamEvent(kind="delta", text=delta, model=model)
+                    if getattr(choice, "finish_reason", None):
+                        finish_reason = choice.finish_reason
+            finally:
+                try:
+                    await response.close()
+                except Exception:
+                    pass
+            yield StreamEvent(kind="done", model=model, finish_reason=finish_reason, usage=usage)
+            return
+        except (VisionCraftError, _Fallback, _Retry):
+            raise
+        except (APIConnectionError, APITimeoutError) as exc:
+            if emitted_delta:
+                raise error("UPSTREAM_ERROR", "The provider connection dropped mid-stream.") from exc
+            if attempt >= max_retries:
+                raise _Fallback() from exc
+            raise _Retry(_backoff(attempt)) from exc
+        except APIStatusError as exc:
+            status = _exc_status(exc)
+            message = _exc_message(exc)
+            if _is_stream_options_rejection(status, message):
+                if not use_stream_options:
+                    raise error("UPSTREAM_ERROR", "The provider rejected the request (HTTP 400).") from exc
+                raise _Fallback(retry_same_model=True) from exc
+            if status in (401, 403):
+                raise error(
+                    "AUTH_FAILED",
+                    "Hugging Face rejected the token. It needs a fine-grained token with the "
+                    "'Make calls to Inference Providers' permission.",
+                ) from exc
+            if _is_credit_error(status, message):
+                raise error(
+                    "CREDITS_EXHAUSTED",
+                    "Monthly Hugging Face inference credits are used up. Upgrade, wait for the reset, "
+                    "or point HF_BASE_URL at another provider.",
+                ) from exc
+            if _is_unsupported_model(status, message):
+                raise _Fallback() from exc
+            if status in RETRYABLE_STATUSES and not emitted_delta:
+                if attempt >= max_retries:
+                    raise _Fallback() from exc
+                override = _retry_after_seconds(exc)
+                raise _Retry(override if override is not None else _backoff(attempt)) from exc
+            if emitted_delta:
+                raise error("UPSTREAM_ERROR", "The provider errored mid-stream.") from exc
+            if status is not None and status >= 500:
+                raise _Fallback() from exc
+            raise error(
+                "UPSTREAM_ERROR",
+                f"The provider returned an error (HTTP {status})." if status else "The provider returned an error.",
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 - unknown SDK failure
+            if emitted_delta:
+                raise error("UPSTREAM_ERROR", "The provider errored mid-stream.") from exc
+            raise error("UPSTREAM_ERROR", "The provider request failed.") from exc

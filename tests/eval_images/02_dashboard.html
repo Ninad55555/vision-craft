@@ -1,0 +1,40 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Nimbus Analytics</title><style>
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a; background:#fff; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+
+  body { background:#f1f5f9; }
+  .app { display:flex; min-height:100vh; }
+  aside { width:230px; background:#0f172a; color:#cbd5e1; padding:24px 0; }
+  aside .logo { font-size:19px; font-weight:700; color:#fff; padding:0 24px 24px; }
+  aside ul { list-style:none; }
+  aside li { padding:11px 24px; font-size:14px; }
+  aside li.on { background:#1e293b; color:#38bdf8; border-right:3px solid #38bdf8; }
+  main { flex:1; padding:28px 34px; }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+  .top h1 { font-size:24px; }
+  .top .sub { color:#64748b; font-size:13px; margin-top:4px; }
+  .search { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:9px 14px; font-size:13px; color:#94a3b8; width:220px; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-bottom:24px; }
+  .kpi { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px 20px; }
+  .kpi span { font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.5px; }
+  .kpi b { display:block; font-size:28px; margin-top:8px; }
+  .kpi i { font-style:normal; font-size:12px; color:#16a34a; }
+  .kpi i.dn { color:#dc2626; }
+  .panels { display:grid; grid-template-columns:2fr 1fr; gap:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:20px 22px; }
+  .panel h2 { font-size:15px; margin-bottom:18px; }
+  .bars { display:flex; align-items:flex-end; gap:14px; height:170px; }
+  .bars div { flex:1; background:#38bdf8; border-radius:4px 4px 0 0; }
+  .bars div:nth-child(even) { background:#6366f1; }
+  .legend { list-style:none; font-size:13px; }
+  .legend li { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+  .legend i { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:8px; }
+</style></head><body><div class="app">
+<aside><div class="logo">&#9678; Nimbus</div><ul><li class="on">Overview</li><li>Visitors</li><li>Revenue</li><li>Funnels</li><li>Retention</li><li>Settings</li></ul></aside>
+<main><div class="top"><div><h1>Overview</h1><div class="sub">Last 30 days &middot; updated 2 min ago</div></div><input class="search" placeholder="Search metrics..."></div>
+<div class="kpis"><div class="kpi"><span>Sessions</span><b>84,209</b><i>&#9650; 12.4%</i></div><div class="kpi"><span>Signups</span><b>1,337</b><i>&#9650; 4.1%</i></div><div class="kpi"><span>Revenue</span><b>$48,910</b><i>&#9650; 9.7%</i></div><div class="kpi"><span>Bounce</span><b>38.2%</b><i class="dn">&#9660; 2.3%</i></div></div>
+<div class="panels"><div class="panel"><h2>Weekly active users</h2><div class="bars"><div style="height:55%"></div><div style="height:72%"></div><div style="height:48%"></div><div style="height:86%"></div><div style="height:64%"></div><div style="height:93%"></div><div style="height:77%"></div><div style="height:58%"></div></div></div>
+<div class="panel"><h2>Top pages</h2><ul class="legend"><li><span><i style="background:#38bdf8"></i>/pricing</span><b>12.4k</b></li><li><span><i style="background:#6366f1"></i>/blog/launch</span><b>9.8k</b></li><li><span><i style="background:#f472b6"></i>/docs/api</span><b>7.1k</b></li><li><span><i style="background:#34d399"></i>/signup</span><b>5.6k</b></li><li><span><i style="background:#fbbf24"></i>/</span><b>4.2k</b></li></ul></div></div>
+</main></div></body></html>

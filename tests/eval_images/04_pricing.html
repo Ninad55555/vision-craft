@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Pricing - Sketchpad</title><style>
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a; background:#fff; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+
+  header { text-align:center; padding:64px 0 20px; }
+  header h1 { font-size:42px; letter-spacing:-1px; }
+  header p { color:#64748b; margin-top:12px; font-size:17px; }
+  .toggle { display:inline-flex; background:#f1f5f9; border-radius:999px; padding:4px; margin-top:26px; font-size:14px; }
+  .toggle span { padding:8px 20px; border-radius:999px; }
+  .toggle .on { background:#fff; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .plans { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; max-width:1000px; margin:40px auto 0; padding:0 32px; }
+  .plan { border:1px solid #e2e8f0; border-radius:14px; padding:32px 28px; background:#fff; }
+  .plan.best { border:2px solid #7c3aed; position:relative; box-shadow:0 12px 34px rgba(124,58,237,.14); }
+  .plan.best::before { content:'Most popular'; position:absolute; top:-13px; left:50%; transform:translateX(-50%); background:#7c3aed; color:#fff; font-size:11px; font-weight:700; padding:5px 14px; border-radius:999px; text-transform:uppercase; letter-spacing:.6px; }
+  .plan h3 { font-size:17px; color:#334155; }
+  .plan .price { font-size:44px; font-weight:800; margin:14px 0 2px; }
+  .plan .price small { font-size:15px; font-weight:400; color:#64748b; }
+  .plan .desc { font-size:13px; color:#64748b; min-height:38px; }
+  .plan ul { list-style:none; margin:22px 0 26px; font-size:14px; color:#334155; }
+  .plan li { padding:7px 0; }
+  .plan li::before { content:'\2713'; color:#7c3aed; font-weight:700; margin-right:10px; }
+  .plan button { width:100%; padding:11px; border-radius:8px; font-size:14px; font-weight:600; border:1px solid #cbd5e1; background:#fff; cursor:pointer; }
+  .plan.best button { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+  .note { text-align:center; color:#94a3b8; font-size:13px; padding:36px 0 60px; }
+</style></head><body>
+<header><h1>Simple pricing for every team</h1><p>Start free. Upgrade when your team grows. Cancel anytime.</p><div class="toggle"><span class="on">Monthly</span><span>Yearly (save 20%)</span></div></header>
+<div class="plans">
+<div class="plan"><h3>Starter</h3><div class="price">$0<small>/mo</small></div><div class="desc">For solo makers exploring the basics.</div><ul><li>3 projects</li><li>Community support</li><li>Basic export</li><li>1 GB storage</li></ul><button>Get started</button></div>
+<div class="plan best"><h3>Pro</h3><div class="price">$24<small>/mo per seat</small></div><div class="desc">For growing teams that ship weekly.</div><ul><li>Unlimited projects</li><li>Version history</li><li>Priority support</li><li>50 GB storage</li><li>Custom domains</li></ul><button>Start 14-day trial</button></div>
+<div class="plan"><h3>Enterprise</h3><div class="price">$79<small>/mo per seat</small></div><div class="desc">For orgs with security requirements.</div><ul><li>SSO &amp; SCIM</li><li>Audit logs</li><li>Dedicated CSM</li><li>Unlimited storage</li><li>99.99% SLA</li></ul><button>Contact sales</button></div>
+</div><p class="note">All prices in USD. VAT may apply.</p></body></html>

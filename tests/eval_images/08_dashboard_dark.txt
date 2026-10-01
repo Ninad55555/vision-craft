@@ -1,0 +1,1 @@
+Pulseboard Live view Alerts Services Deployments Settings Live view all systems normal Requests / min 48,201 3.2% Error rate 0.04% 0.01% p99 latency 212 ms 8 ms Recent deploys Service Version Status checkout-api v2.14.1 healthy search-indexer v1.9.0 healthy billing-worker v3.2.2 degraded Top endpoints Route RPM POST /v1/orders 12,400 GET /v1/search 9,830 GET /v1/users/me 7,112
