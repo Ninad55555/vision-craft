@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ping - Design Team</title><style>
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+
+  body { background:#f1f5f9; color:#0f172a; max-width:390px; margin:0 auto; }
+  .bar { background:#4f46e5; color:#fff; padding:14px 16px; display:flex; align-items:center; gap:10px; position:sticky; top:0; }
+  .bar .av { width:34px; height:34px; border-radius:50%; background:#c7d2fe; display:flex; align-items:center; justify-content:center; font-weight:800; color:#3730a3; }
+  .bar b { font-size:15px; display:block; } .bar span { font-size:11px; opacity:.8; }
+  .chat { padding:14px 12px 90px; display:flex; flex-direction:column; gap:10px; }
+  .day { text-align:center; font-size:11px; color:#94a3b8; margin:6px 0; }
+  .msg { max-width:78%; padding:10px 13px; border-radius:16px; font-size:14px; line-height:1.45; }
+  .them { background:#fff; border:1px solid #e2e8f0; border-top-left-radius:4px; align-self:flex-start; }
+  .me { background:#4f46e5; color:#fff; border-top-right-radius:4px; align-self:flex-end; }
+  .who { font-size:11px; color:#64748b; margin-bottom:2px; }
+  .input { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:390px; max-width:100%; background:#fff; border-top:1px solid #e2e8f0; padding:10px 12px; display:flex; gap:8px; }
+  .input .box { flex:1; background:#f1f5f9; border-radius:999px; padding:10px 16px; font-size:14px; color:#94a3b8; }
+  .input .send { width:38px; height:38px; border-radius:50%; background:#4f46e5; color:#fff; border:none; font-size:16px; }
+</style></head><body>
+<div class="bar"><div class="av">D</div><div><b>Design Team</b><span>4 online</span></div></div>
+<div class="chat"><div class="day">Today</div>
+<div><div class="who">Mara 9:41</div><div class="msg them">Morning! The onboarding flow is ready for review</div></div>
+<div><div class="who">Jon 9:44</div><div class="msg them">Nice — checking the empty states now</div></div>
+<div class="msg me">I pushed the new illustrations last night</div>
+<div><div class="who">Mara 9:47</div><div class="msg them">These are great. Ship it?</div></div>
+<div class="msg me">One more pass on the error copy, then yes</div>
+<div><div class="who">Jon 9:52</div><div class="msg them">+1. Also the loading skeleton flickers on slow 4G</div></div>
+<div class="msg me">Good catch — I will file that as a separate ticket</div>
+</div>
+<div class="input"><div class="box">Message</div><button class="send">&#8593;</button></div>
+</body></html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Cart - Ember &amp; Oak</title><style>
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+
+  body { color:#1c1917; background:#fafaf9; }
+  nav { background:#fff; display:flex; justify-content:space-between; padding:18px 0; border-bottom:1px solid #e7e5e4; align-items:center; }
+  .logo { font-weight:800; } nav ul { display:flex; gap:24px; list-style:none; font-size:14px; color:#57534e; }
+  h1 { font-size:30px; margin:30px 0 20px; }
+  .page { display:grid; grid-template-columns:2fr 1fr; gap:28px; padding-bottom:60px; }
+  .item { background:#fff; border:1px solid #e7e5e4; border-radius:12px; padding:18px; display:flex; gap:18px; margin-bottom:14px; }
+  .item .ph { width:110px; height:110px; border-radius:8px; background:#f5f5f4; display:flex; align-items:center; justify-content:center; font-size:44px; flex:none; }
+  .item b { display:block; font-size:15px; } .item .v { font-size:13px; color:#78716c; margin:4px 0 10px; }
+  .item .q { display:inline-flex; gap:12px; border:1px solid #e7e5e4; border-radius:6px; padding:4px 12px; font-size:13px; }
+  .item .p { margin-left:auto; font-weight:800; }
+  .item .rm { display:block; margin-left:auto; margin-top:8px; background:none; border:none; color:#a8a29e; font-size:12px; cursor:pointer; }
+  .summary { background:#fff; border:1px solid #e7e5e4; border-radius:12px; padding:24px; height:fit-content; }
+  .summary h2 { font-size:18px; margin-bottom:16px; }
+  .row { display:flex; justify-content:space-between; font-size:14px; padding:6px 0; color:#57534e; }
+  .row.total { font-size:17px; font-weight:800; color:#1c1917; border-top:1px solid #e7e5e4; margin-top:10px; padding-top:14px; }
+  .out { width:100%; background:#1c1917; color:#fff; border:none; border-radius:8px; padding:14px; font-size:15px; font-weight:700; margin-top:16px; }
+  .promo { display:flex; gap:8px; margin-top:12px; }
+  .promo input { flex:1; border:1px solid #d6d3d1; border-radius:8px; padding:10px 12px; font-size:13px; }
+  .promo button { border:1px solid #d6d3d1; background:#fff; border-radius:8px; padding:10px 16px; font-size:13px; font-weight:600; }
+</style></head><body>
+<nav><div class="wrap" style="display:flex;justify-content:space-between;width:100%"><div class="logo">Ember &amp; Oak</div><ul><li>Shop</li><li>Collections</li><li>About</li><li>Cart (2)</li></ul></div></nav>
+<div class="wrap"><h1>Your cart (2 items)</h1><div class="page"><div>
+<div class="item"><div class="ph">&#128186;</div><div><b>Aurora Lounge Chair</b><div class="v">Oatmeal / Oak legs</div><span class="q">- 1 +</span></div><div><span class="p">$449.00</span><button class="rm">Remove</button></div></div>
+<div class="item"><div class="ph">&#128294;</div><div><b>Brass Floor Lamp</b><div class="v">Brushed brass / Linen shade</div><span class="q">- 1 +</span></div><div><span class="p">$189.00</span><button class="rm">Remove</button></div></div>
+</div>
+<div class="summary"><h2>Order summary</h2><div class="row"><span>Subtotal</span><span>$638.00</span></div><div class="row"><span>Shipping</span><span>Free</span></div><div class="row"><span>Tax</span><span>$51.04</span></div><div class="row total"><span>Total</span><span>$689.04</span></div>
+<button class="out">Checkout securely</button>
+<div class="promo"><input placeholder="Promo code"><button>Apply</button></div></div>
+</div></div></body></html>

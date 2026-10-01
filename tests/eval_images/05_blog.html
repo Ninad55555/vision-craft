@@ -1,0 +1,37 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Why we rewrote our parser - Fieldnotes</title><style>
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a; background:#fff; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+
+  nav { border-bottom:1px solid #e2e8f0; padding:18px 0; }
+  nav .wrap { display:flex; justify-content:space-between; align-items:center; }
+  nav .logo { font-weight:800; font-size:19px; }
+  nav ul { display:flex; gap:24px; list-style:none; font-size:14px; color:#475569; }
+  article { max-width:720px; margin:0 auto; padding:56px 24px; }
+  .tag { display:inline-block; background:#fef3c7; color:#b45309; font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px; text-transform:uppercase; letter-spacing:.5px; }
+  article h1 { font-size:40px; line-height:1.2; letter-spacing:-.8px; margin:20px 0 18px; }
+  .meta { color:#64748b; font-size:14px; padding-bottom:26px; border-bottom:1px solid #e2e8f0; }
+  .meta b { color:#0f172a; }
+  article p { font-size:17px; line-height:1.75; color:#334155; margin:22px 0; }
+  article h2 { font-size:25px; margin:38px 0 14px; color:#0f172a; }
+  blockquote { border-left:4px solid #f59e0b; background:#fffbeb; padding:18px 24px; margin:26px 0; font-style:italic; color:#92400e; border-radius:0 8px 8px 0; }
+  pre { background:#0f172a; color:#e2e8f0; padding:20px; border-radius:10px; font-size:14px; overflow-x:auto; margin:26px 0; }
+  .author { display:flex; gap:14px; align-items:center; margin-top:44px; padding-top:26px; border-top:1px solid #e2e8f0; }
+  .author .av { width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,#38bdf8,#818cf8); }
+  .author b { display:block; font-size:15px; }
+  .author span { font-size:13px; color:#64748b; }
+</style></head><body>
+<nav><div class="wrap"><div class="logo">&#9998; Fieldnotes</div><ul><li>Engineering</li><li>Design</li><li>Changelog</li><li>Subscribe</li></ul></div></nav>
+<article><span class="tag">Engineering</span><h1>Why we rewrote our parser (and you should too)</h1><div class="meta"><b>Maya Okafor</b> &middot; Oct 12, 2025 &middot; 8 min read</div>
+<p>Our old parser had one job: turn configuration files into a tree. It did that job for four years, and it did it wrong for three of them. Last quarter we rewrote it in 1,100 lines and cut config errors by 71%.</p>
+<blockquote>The best code is the code you delete. The second best is the code you finally understand well enough to rewrite.</blockquote>
+<h2>The problem with lenient parsing</h2>
+<p>Lenient parsing feels friendly. It silently drops unknown keys, guesses types, and returns something "close enough". But every silent recovery is a bug you will debug at 2 a.m. six months later.</p>
+<pre><code>config = parse(text)   # never raises
+# ... 400 lines later ...
+assert config is not None   # it was None</code></pre>
+<h2>What we changed</h2>
+<p>We made every error explicit, attached line numbers to all of them, and added a <em>did-you-mean</em> suggestion for unknown keys. The parser is smaller, slower by 4%, and dramatically more honest.</p>
+<div class="author"><div class="av"></div><div><b>Maya Okafor</b><span>Staff engineer, infrastructure</span></div></div>
+</article></body></html>
