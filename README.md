@@ -1,69 +1,115 @@
 # VisionCraft
 
-VisionCraft is a lightweight multimodal assistant for screenshot UI grounding and React/Tailwind reconstruction. It requests normalized bounding boxes on a shared integer grid from 0 to 1000, draws those boxes over the screenshot, and extracts generated JSX.
+Upload a UI screenshot → a Hugging Face–hosted Qwen vision-language model reads
+it → you get **one standalone `.html` file** (HTML + CSS + JS inline, zero
+external dependencies) to preview, copy, and download.
+
+Output is **a first draft, not pixel-perfect**. Expect approximated spacing,
+system fonts, and placeholder graphics. You will hand-edit the result.
 
 ## Requirements
 
-- Python 3.10 or newer
-- A Hugging Face token with access to Inference Providers for hosted inference
-- Optional local inference: a compatible CPU or CUDA PyTorch setup. The default local model is SmolVLM-500M; Qwen2.5-VL-3B can also be configured, but needs substantially more memory.
-
-Hosted inference is the default and does not download model weights. Local fallback is opt-in. 4-bit BitsAndBytes is optional and is only listed for Linux; Windows users can use the HF API or a compatible local PyTorch setup without this flag.
+- Python 3.10+ (developed on 3.13)
+- A Hugging Face token with the **“Make calls to Inference Providers”**
+  permission, plus inference credits (free accounts get roughly $0.10/month;
+  plan on PRO or another OpenAI-compatible provider for real use)
 
 ## Setup
 
 ```powershell
-py -3.10 -m venv .venv
+py -m venv .venv
 .venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-Copy-Item .env.example .env
+pip install -r requirements-dev.txt
+Copy-Item .env.example .env        # then set HF_TOKEN
+python scripts\list_models.py      # confirm the model is live today
 ```
 
-Set `HF_TOKEN` in the current shell or add it to `.env` and load it with your preferred environment-variable tool. VisionCraft reads environment variables directly and does not automatically parse `.env` files. Never commit a real token.
-
-For a lean server install, you can omit the training-only dependencies (`datasets`, `peft`, `trl`, and `bitsandbytes`) and keep the packages needed for the API/demo/inference. Hosted inference needs a token and a model supported by the selected Hugging Face provider. Model/provider availability and free-tier limits can change; transient throttles are retried, but are not bypassed.
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env
+python scripts/list_models.py
+```
 
 ## Run
 
-Start the API from the repository root:
-
 ```powershell
-uvicorn app.api:app --reload
+uvicorn app.api:app --host 127.0.0.1 --port 8000
+# UI at http://127.0.0.1:8000  ·  health at /health  ·  API docs at /docs
 ```
 
-Open `http://127.0.0.1:8000/docs` to submit a screenshot to `POST /predict`. The response includes grid boxes, a base64-encoded PNG overlay, the cleaned React code, and a lightweight JSX validity warning. `GET /health` does not load a model.
+Pick, drag-drop, or paste (`Ctrl+V`) a screenshot, optionally add
+instructions, and click **Generate**. Switch the preview between Fit / 768 /
+390 px, then **Copy** or **Download** the single file.
 
-Launch the interactive Gradio demo in a second terminal:
-
-```powershell
-python -m app.ui
-```
-
-The dashboard shows the annotated screenshot, extracted JSX, and a best-effort preview inside a sandboxed iframe. Its preview uses browser CDN scripts and generated code; treat model output as untrusted and do not paste secrets into prompts.
-
-## CLI
+Smoke test without the browser:
 
 ```powershell
-python scripts/test_inference.py path\to\screenshot.png --prompt "Find the search field"
+python scripts\smoke_test.py path\to\screenshot.png --out out.html
 ```
 
-The CLI saves `visioncraft-overlay.png` by default. Pass `--output` to choose a different path.
+## Configuration (`.env`)
 
-## Local inference
+Everything is configured via `.env` (loaded with pydantic-settings — the old
+“does not parse `.env`” bug is gone). Any OpenAI-compatible provider works:
+just change `HF_BASE_URL`. Swap models with `HF_MODEL_ID` /
+`HF_FALLBACK_MODEL_IDS` — no code changes. Set `APP_ACCESS_KEY` if the server
+is reachable by anyone but you, otherwise strangers spend your credits.
 
-Set `VISIONCRAFT_ENABLE_LOCAL_FALLBACK=true` and optionally `VISIONCRAFT_LOCAL_MODEL_ID=HuggingFaceTB/SmolVLM-500M-Instruct`. Weights load lazily on the first request. To request low-VRAM 4-bit loading, set `VISIONCRAFT_LOCAL_4BIT=true` on a supported Linux/CUDA environment with a compatible BitsAndBytes build. Local model compatibility depends on your Transformers, PyTorch, hardware, and model card; failures are returned with a clear inference error.
+Model status (checked 2026-10-01 via `list_models.py`): the largest Qwen VL
+actually served is `Qwen/Qwen3-VL-235B-A22B-Instruct` (default), with
+`Qwen2.5-VL-72B-Instruct` and `Qwen3-VL-30B-A3B-Instruct` as fallbacks.
+`Qwen3-VL-8B-Instruct` does not exist on the router. Re-run
+`list_models.py` whenever quality drops — availability shifts without notice.
 
-## Dataset and fine-tuning
-
-`src/dataset/loader.py` adapts common JSON/JSONL RICO and ScreenSpot annotation keys to a ChatML-like record. Dataset exports vary, so verify image paths and annotation units against the source before training. Pixel boxes are normalized independently by width and height; set `bbox_normalized: true` when input boxes already use the 0-1000 grid.
-
-The QLoRA script is a training starter, not a universal VLM trainer. Multimodal collators, supported auto-model classes, and LoRA target modules vary by model. Validate against the selected model card and run a tiny dataset first:
+## Tests
 
 ```powershell
-python scripts/fine_tune_qlora.py --dataset data\train.jsonl --model HuggingFaceTB/SmolVLM-500M-Instruct --steps 10
+pytest -q
 ```
 
-## Configuration
+64 unit tests, all mocked (no network): image prep, palette, prompts,
+streaming client (retry/fallback/typed errors), HTML cleaner, sanitizer
+(hostile fixture proves zero external URLs survive), API routes (SSE ordering,
+auth, rate limit, access key, token-leak, timeouts), settings.
 
-Defaults live in `configs/config.yaml`. `HF_TOKEN`, `HF_MODEL_ID`, `VISIONCRAFT_BACKEND`, `VISIONCRAFT_ENABLE_LOCAL_FALLBACK`, `VISIONCRAFT_LOCAL_MODEL_ID`, `VISIONCRAFT_LOCAL_4BIT`, `VISIONCRAFT_TIMEOUT`, and `VISIONCRAFT_CONFIG` can be set as environment variables. HF is the primary backend; local execution is used only when explicitly enabled (including as fallback).
+The 15-image test set lives in `tests/eval_images/` (PNG + HTML source +
+`.txt` ground truth); results go in `docs/RESULTS.md`.
+
+## Known limitations
+
+- Output is a first draft. Wrong spacing, approximated fonts, placeholder
+  images, and occasional missing sections are normal.
+- Quality depends heavily on the model; small models (≤ ~8B) struggle on dense
+  pages. Prefer the largest VL model your credits allow.
+- Free Hugging Face accounts have very small monthly inference credits; expect
+  `CREDITS_EXHAUSTED` and plan for a paid tier or another provider.
+- Very tall pages lose fidelity toward the bottom.
+- Generated JavaScript is filtered and sandboxed, but treat every output as
+  untrusted until you read it: preview runs in `sandbox="allow-scripts"` with
+  its own restrictive CSP, downloads are sanitized the same way.
+
+## Security notes
+
+- `HF_TOKEN` never leaves the server (responses, errors, and logs are
+  redacted; there is a test for this).
+- Uploads are processed in memory and never written to disk.
+- Per-IP rate limiting (`RATE_LIMIT_PER_MINUTE`) and an optional
+  `APP_ACCESS_KEY` protect your credits.
+- Text inside a screenshot can carry prompt-injection (“ignore previous
+  instructions”); the model has no tools and its only output channel is
+  sanitized, sandboxed HTML.
+- Never commit `.env`. Check with `git ls-files | findstr .env` —
+  only `.env.example` belongs in git.
+
+## Layout
+
+```
+app/        FastAPI: api.py (routes/SSE/guards), settings.py, schemas.py
+src/core/   errors.py, image_prep.py, palette.py, prompts(.py,/*.md), hf_client.py
+src/generator/  html_cleaner.py, sanitize.py
+web/        vanilla frontend: index.html, app.js, styles.css
+scripts/    list_models.py, smoke_test.py
+tests/      unit tests + fixtures/ + eval_images/ (15-image set)
+docs/       RESULTS.md
+```
