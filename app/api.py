@@ -197,11 +197,15 @@ def create_app() -> FastAPI:
             return JSONResponse({"detail": _public_detail(exc)}, status_code=exc.http_status)
         return JSONResponse(result.model_dump(mode="json", exclude_none=True))
 
+    # React frontend (frontend/dist) takes precedence; legacy vanilla web/ is the fallback.
+    dist_dir = settings_module.ROOT / "frontend" / "dist"
     web_dir = settings_module.ROOT / "web"
-    if web_dir.is_dir():
+    if dist_dir.is_dir():
+        app.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
+    elif web_dir.is_dir():
         app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
     else:
-        log.warning("web/ directory not found; serving API only until the M2 frontend lands.")
+        log.warning("No frontend found (frontend/dist or web/); serving API only.")
 
     return app
 

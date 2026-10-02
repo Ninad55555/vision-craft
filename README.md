@@ -31,11 +31,20 @@ cp .env.example .env
 python scripts/list_models.py
 ```
 
+## Frontend (React)
+
+```powershell
+cd frontend
+npm install
+npm run dev     # dev UI at http://localhost:5173 (proxies /api to :8000)
+npm run build   # emits frontend/dist, served by FastAPI below
+```
+
 ## Run
 
 ```powershell
 uvicorn app.api:app --host 127.0.0.1 --port 8000
-# UI at http://127.0.0.1:8000  ·  health at /health  ·  API docs at /docs
+# UI at http://127.0.0.1:8000 (frontend/dist if built, else legacy web/)  ·  health at /health  ·  API docs at /docs
 ```
 
 Pick, drag-drop, or paste (`Ctrl+V`) a screenshot, optionally add
