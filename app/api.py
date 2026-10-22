@@ -117,10 +117,11 @@ def _security_headers() -> dict:
 
 
 def _redact(text: str) -> str:
-    """Strip the HF token from any string that crosses the API boundary."""
-    token = get_settings().hf_token
-    if token and len(token) >= 4 and token in text:
-        return text.replace(token, "[redacted]")
+    """Strip provider credentials from any string that crosses the API boundary."""
+    settings = get_settings()
+    for token in (settings.hf_token, settings.groq_api_key, settings.google_api_key):
+        if token and len(token) >= 4 and token in text:
+            text = text.replace(token, "[redacted]")
     return text
 
 
@@ -228,8 +229,8 @@ async def _run_pipeline(
 ) -> ResultPayload:
     settings = get_settings()
     started = time.monotonic()
-    if not settings.hf_token:
-        raise error("AUTH_MISSING", "Server has no HF_TOKEN set. Add it to .env and restart.")
+    if not (settings.hf_token or settings.groq_api_key or settings.google_api_key):
+        raise error("AUTH_MISSING", "Configure at least one provider: HF_TOKEN, GROQ_API_KEY, or GOOGLE_API_KEY.")
 
     if on_event:
         on_event(StreamEvent(kind="status", text="preparing"))
@@ -249,6 +250,7 @@ async def _run_pipeline(
     finish_reason: str | None = None
     usage: dict | None = None
     model_used = settings.hf_model_id
+    provider_used: str | None = None
     chunks: list[str] = []
     generating_announced = False
 
@@ -257,14 +259,13 @@ async def _run_pipeline(
             raise error("INTERNAL", "Client disconnected; generation cancelled.")
         if event.kind == "status":
             if event.note:
-                warnings.append(event.note)
                 if on_event:
-                    on_event(StreamEvent(kind="status", text="calling_model", model=event.model, note=event.note))
+                    on_event(StreamEvent(kind="status", text="calling_model", model=event.model, note=event.note, provider=event.provider))
             elif on_event:
-                on_event(StreamEvent(kind="status", text="calling_model", model=event.model))
+                on_event(StreamEvent(kind="status", text="calling_model", model=event.model, provider=event.provider))
         elif event.kind == "delta":
             if not generating_announced and on_event:
-                on_event(StreamEvent(kind="status", text="generating", model=event.model))
+                on_event(StreamEvent(kind="status", text="generating", model=event.model, provider=event.provider))
                 generating_announced = True
             chunks.append(event.text)
             if on_event:
@@ -273,8 +274,7 @@ async def _run_pipeline(
             finish_reason = event.finish_reason
             usage = event.usage
             model_used = event.model or model_used
-            if event.note and event.note not in warnings:
-                warnings.append(event.note)
+            provider_used = event.provider or provider_used
 
     if on_event:
         on_event(StreamEvent(kind="status", text="postprocessing"))
@@ -287,6 +287,7 @@ async def _run_pipeline(
     return ResultPayload(
         html=standalone,
         model=model_used,
+        provider=provider_used,
         finish_reason=finish_reason,
         truncated=bool(truncated),
         warnings=warnings,
@@ -312,7 +313,7 @@ def _streaming_response(request: Request, raw: bytes, instructions: str, timeout
                 stage = {"calling_model", "generating", "postprocessing"}
                 text = client_event.text if client_event.text in stage else "preparing"
                 queue.put_nowait(
-                    sse("status", StatusData(stage=text, note=client_event.note or None, model=client_event.model or None))
+                    sse("status", StatusData(stage=text, note=client_event.note or None, model=client_event.model or None, provider=client_event.provider or None))
                 )
             elif client_event.kind == "delta":
                 queue.put_nowait(sse("delta", DeltaData(text=client_event.text)))
