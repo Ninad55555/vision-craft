@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     hf_base_url: str = "https://router.huggingface.co/v1"
     hf_model_id: str = "Qwen/Qwen3-VL-235B-A22B-Instruct"
     hf_fallback_model_ids: str = ""
+    groq_api_key: str = ""
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_model_id: str = "qwen/qwen3.8-27b"
+    google_api_key: str = ""
+    gemini_model_id: str = Field(default="gemini-2.5-flash", validation_alias="GEMINI_MODEL_ID")
     max_output_tokens: int = 8192
     temperature: float = 0.2
     request_timeout_seconds: float = 300
