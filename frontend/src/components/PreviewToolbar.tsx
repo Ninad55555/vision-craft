@@ -7,20 +7,24 @@ interface Props {
   setTab: (t: ActiveTab) => void
   mode: PreviewMode
   setMode: (m: PreviewMode) => void
+  canCompare: boolean
 }
 
-const TABS: { id: ActiveTab; label: string; icon: 'eye' | 'code' }[] = [
+const TABS: { id: ActiveTab; label: string; icon: 'eye' | 'code' | 'compare' }[] = [
   { id: 'preview', label: 'Preview', icon: 'eye' },
+  { id: 'compare', label: 'Compare', icon: 'compare' },
   { id: 'code', label: 'Code', icon: 'code' },
 ]
 
-export default function PreviewToolbar({ tab, setTab, mode, setMode }: Props) {
+export default function PreviewToolbar({ tab, setTab, mode, setMode, canCompare }: Props) {
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const onTabKey = (e: React.KeyboardEvent, i: number) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
     e.preventDefault()
-    const next = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length
+    const step = e.key === 'ArrowRight' ? 1 : -1
+    let next = (i + step + TABS.length) % TABS.length
+    while (TABS[next].id === 'compare' && !canCompare) next = (next + step + TABS.length) % TABS.length
     tabRefs.current[next]?.focus()
     setTab(TABS[next].id)
   }
@@ -37,7 +41,10 @@ export default function PreviewToolbar({ tab, setTab, mode, setMode }: Props) {
             id={`tab-${t.id}`}
             aria-selected={tab === t.id}
             aria-controls={`panel-${t.id}`}
+            aria-disabled={t.id === 'compare' && !canCompare}
             tabIndex={tab === t.id ? 0 : -1}
+            disabled={t.id === 'compare' && !canCompare}
+            title={t.id === 'compare' && !canCompare ? 'Generate output for the current screenshot to enable comparison' : undefined}
             onClick={() => setTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
@@ -45,9 +52,6 @@ export default function PreviewToolbar({ tab, setTab, mode, setMode }: Props) {
             {t.label}
           </button>
         ))}
-        <button type="button" role="tab" aria-selected={false} disabled title="Compare view is coming soon (P1)">
-          Compare · soon
-        </button>
       </div>
       <div className="device-toggle" role="group" aria-label="Preview width">
         {(['fit', 'tablet', 'mobile'] as PreviewMode[]).map((m) => (

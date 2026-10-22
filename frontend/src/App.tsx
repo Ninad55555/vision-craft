@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import CodeEditor from './components/CodeEditor/CodeEditor'
+import CompareView from './components/CompareView'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
-import Header from './components/Header'
 import Icon from './components/Icon'
+import LandingPage from './components/LandingPage'
 import LoadingState from './components/LoadingState'
 import Preview from './components/Preview'
 import PreviewToolbar from './components/PreviewToolbar'
@@ -16,13 +17,14 @@ import { normalizeHtml } from './utils/html'
 
 const MAX_INSTRUCTIONS = 1000
 
-export default function App() {
+function StudioPage({ onHome }: { onHome: () => void }) {
   const [config, setConfig] = useState<BackendConfig | null>(null)
   const [configError, setConfigError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
   const [instructions, setInstructions] = useState('')
   const [generatedCode, setGeneratedCode] = useState('')
+  const [generatedFrom, setGeneratedFrom] = useState<File | null>(null)
   const [tab, setTab] = useState<ActiveTab>('preview')
   const [mode, setMode] = useState<PreviewMode>('fit')
   const [copied, setCopied] = useState(false)
@@ -49,8 +51,17 @@ export default function App() {
   const htmlKb = useMemo(() => (new TextEncoder().encode(previewDocument).length / 1024).toFixed(1), [previewDocument])
 
   useEffect(() => {
-    if (gen.result) setGeneratedCode(gen.result.html)
-  }, [gen.result])
+    if (gen.result) {
+      setGeneratedCode(gen.result.html)
+      setGeneratedFrom(file)
+    }
+  }, [gen.result, file])
+
+  const canCompare = !!file && file === generatedFrom && !!previewDocument
+
+  useEffect(() => {
+    if (!canCompare && tab === 'compare') setTab('preview')
+  }, [canCompare, tab])
 
   const start = () => {
     if (!file || gen.generating) return
@@ -91,8 +102,6 @@ export default function App() {
   return (
     <>
       <a className="skip-link" href="#output">Skip to generated output</a>
-      <Header model={config?.model ?? ''} online={!!config} />
-
       {config?.requires_access_key && (
         <div className="access-banner">
           <Icon name="alert" size={16} />
@@ -107,6 +116,23 @@ export default function App() {
         </div>
       )}
 
+      <section className="workspace-intro" aria-labelledby="workspace-title">
+        <div className="intro-copy">
+          <button className="studio-home" type="button" onClick={onHome}><Icon name="arrow" size={14} /> Home</button>
+          <p className="eyebrow"><span className="eyebrow-mark" /> Screenshot to interface</p>
+          <h2 id="workspace-title">Bring your designs to life.</h2>
+          <p>Turn a visual reference into clean, responsive HTML you can preview and refine.</p>
+        </div>
+        <div className={`provider-status${gen.generating ? ' is-active' : ''}${gen.error ? ' is-error' : ''}`} aria-live="polite" title={gen.activeModel ?? config?.model ?? 'Provider status'}>
+          <span className="provider-indicator" />
+          <span className="provider-status-copy">
+            <b>{gen.error ? 'Generation failed' : gen.activeProvider ? (gen.generating ? `Using ${gen.activeProvider}` : gen.result ? `Generated with ${gen.result.provider ?? gen.activeProvider}` : gen.activeProvider) : configError ? 'Server unavailable' : config ? 'Ready · automatic fallback' : 'Connecting to server'}</b>
+            <small>{gen.activeModel ? `${gen.error ? 'Last tried · ' : ''}${gen.activeModel}` : (config?.model || 'Checking connection')}</small>
+          </span>
+          {gen.activeProvider && !gen.error && <span className="provider-pill">{gen.generating ? 'LIVE' : 'ACTIVE'}</span>}
+        </div>
+      </section>
+
       <main className="layout">
         <section className="panel input-panel" aria-label="Screenshot input">
           <div className="step">
@@ -117,7 +143,16 @@ export default function App() {
               onFile={(f, err) => { setFile(f); setFileError(err ?? null) }}
             />
             {fileError && <p className="field-error" role="alert">{fileError}</p>}
-            {configError && <p className="field-error" role="alert">{configError}</p>}
+            {configError && (
+              <div className="connection-error" role="alert">
+                <span className="connection-error-icon"><Icon name="alert" size={15} /></span>
+                <span><b>Can’t reach the VisionCraft server</b><small>Check that the backend is running, then retry.</small></span>
+                <button type="button" onClick={() => {
+                  setConfigError(null)
+                  getConfig().then(setConfig).catch((e: Error) => setConfigError(`Could not reach the server (${e.message}). Is it running?`))
+                }}>Retry</button>
+              </div>
+            )}
           </div>
 
           <div className="step">
@@ -159,7 +194,7 @@ export default function App() {
         </section>
 
         <section id="output" className="panel output-panel" aria-label="Generated output" aria-busy={gen.generating}>
-          <PreviewToolbar tab={tab} setTab={setTab} mode={mode} setMode={setMode} />
+          <PreviewToolbar tab={tab} setTab={setTab} mode={mode} setMode={setMode} canCompare={canCompare} />
 
           <div className="toolbar">
             <button type="button" className="btn" disabled={!generatedCode} onClick={copy}>
@@ -226,10 +261,20 @@ export default function App() {
             </div>
           )}
 
+          {tab === 'compare' && canCompare && (
+            <CompareView
+              file={file}
+              document={previewDocument}
+              mode={mode}
+              reloadKey={reloadKey}
+              onLoad={() => setPreviewLoaded(true)}
+            />
+          )}
+
           {gen.result && (
             <div className="result-meta">
-              <span className="meta-chip" title="Model used">
-                <Icon name="spark" size={13} /> {gen.result.model}
+              <span className="meta-chip" title="Provider and model used">
+                <Icon name="spark" size={13} /> {gen.result.provider ? `${gen.result.provider} · ` : ''}{gen.result.model}
               </span>
               <span className="meta-chip" title="Generation time">
                 <Icon name="clock" size={13} /> {(gen.result.elapsed_ms / 1000).toFixed(1)} s
@@ -250,4 +295,21 @@ export default function App() {
       </footer>
     </>
   )
+}
+
+export default function App() {
+  const [studio, setStudio] = useState(() => window.location.pathname.replace(/\/+$/, '') === '/studio')
+  useEffect(() => {
+    const syncRoute = () => setStudio(window.location.pathname.replace(/\/+$/, '') === '/studio')
+    window.addEventListener('popstate', syncRoute)
+    return () => window.removeEventListener('popstate', syncRoute)
+  }, [])
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path)
+    setStudio(path === '/studio')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  return studio
+    ? <StudioPage onHome={() => navigate('/')} />
+    : <LandingPage onOpen={() => navigate('/studio')} />
 }
