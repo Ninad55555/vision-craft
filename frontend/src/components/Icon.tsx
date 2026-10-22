@@ -11,6 +11,8 @@ export type IconName =
   | 'code'
   | 'x'
   | 'clock'
+  | 'arrow'
+  | 'compare'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   spark: <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />,
@@ -50,6 +52,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M12 7.5V12l3 2" />
     </>
   ),
+  arrow: <path d="M5 12h14m-6-6 6 6-6 6" />,
+  compare: <>
+    <rect x="3" y="4" width="7" height="16" rx="1.5" />
+    <rect x="14" y="4" width="7" height="16" rx="1.5" />
+    <path d="M12 8v8" />
+  </>,
 }
 
 export default function Icon({ name, size = 16 }: { name: IconName; size?: number }) {

@@ -13,6 +13,15 @@ class VisionCraftError(Exception):
         return {"code": self.code, "message": self.message, "retryable": self.retryable}
 
 
+class AllInferenceProvidersFailedError(VisionCraftError):
+    """Raised when every configured inference backend has failed."""
+
+    def __init__(self, failures: dict[str, str]):
+        self.failures = dict(failures)
+        detail = "; ".join(f"{name}: {reason}" for name, reason in failures.items())
+        super().__init__("MODEL_UNAVAILABLE", f"All inference providers failed. {detail}", 503, True)
+
+
 # code -> (http_status, retryable)  (SPEC section 9)
 ERROR_TABLE: dict[str, tuple[int, bool]] = {
     "ACCESS_DENIED": (401, False),

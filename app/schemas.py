@@ -45,6 +45,7 @@ class UsageInfo(BaseModel):
 class ResultPayload(BaseModel):
     html: str
     model: str
+    provider: Optional[str] = None
     finish_reason: Optional[str] = None
     truncated: bool = False
     warnings: list[str] = Field(default_factory=list)
@@ -69,6 +70,7 @@ class StatusData(BaseModel):
     stage: Literal["preparing", "calling_model", "generating", "postprocessing"]
     note: Optional[str] = None
     model: Optional[str] = None
+    provider: Optional[str] = None
 
 
 class DeltaData(BaseModel):
