@@ -13,6 +13,7 @@ export interface BackendConfig {
 export interface GenerationResult {
   html: string
   model: string
+  provider?: string | null
   truncated: boolean
   warnings: string[]
   elapsed_ms: number
@@ -29,4 +30,5 @@ export interface StatusEvent {
   stage: 'preparing' | 'calling_model' | 'generating' | 'postprocessing'
   note?: string | null
   model?: string | null
+  provider?: string | null
 }

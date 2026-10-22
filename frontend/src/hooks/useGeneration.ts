@@ -4,9 +4,9 @@ import type { GenerationResult, GenerationStatus } from '../types'
 
 export const ERROR_MESSAGES: Record<string, string> = {
   ACCESS_DENIED: 'This server requires an access key. Enter it above and try again.',
-  AUTH_MISSING: 'The server has no Hugging Face token configured. Add HF_TOKEN to its .env and restart it.',
-  AUTH_FAILED: 'Hugging Face rejected the server token.',
-  CREDITS_EXHAUSTED: 'Monthly Hugging Face inference credits are used up.',
+  AUTH_MISSING: 'No inference provider is configured. Add a provider key to the server environment and restart it.',
+  AUTH_FAILED: 'The configured inference provider rejected its credentials.',
+  CREDITS_EXHAUSTED: 'Inference credits are exhausted for the configured providers.',
   RATE_LIMITED: 'Too many requests. Wait a moment and retry.',
   IMAGE_INVALID: 'That file is not a valid PNG, JPEG, or WebP image.',
   IMAGE_TOO_LARGE: 'That image exceeds the server size limit.',
@@ -20,6 +20,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
 export function useGeneration() {
   const [status, setStatus] = useState<GenerationStatus>('idle')
   const [stage, setStage] = useState('Pick a screenshot to begin.')
+  const [activeProvider, setActiveProvider] = useState<string | null>(null)
+  const [activeModel, setActiveModel] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [tokens, setTokens] = useState(0)
@@ -37,6 +39,8 @@ export function useGeneration() {
     setTokens(0)
     setError(null)
     setResult(null)
+    setActiveProvider(null)
+    setActiveModel(null)
     setStatus('loading')
     setStage('Preparing image…')
     startRef.current = performance.now()
@@ -46,6 +50,8 @@ export function useGeneration() {
       const r = await generateUI(file, instructions, {
         signal: ac.signal,
         onStatus: (s) => {
+          if (s.provider) setActiveProvider(s.provider)
+          if (s.model) setActiveModel(s.model)
           const labels: Record<string, string> = {
             preparing: 'Preparing image…',
             calling_model: s.note ? `Calling model… (${s.note})` : 'Calling model…',
@@ -79,5 +85,5 @@ export function useGeneration() {
 
   const cancel = useCallback(() => aborter.current?.abort(), [])
 
-  return { status, stage, error, result, tokens, elapsed, start, cancel, generating: status === 'loading' }
+  return { status, stage, error, result, tokens, elapsed, activeProvider, activeModel, start, cancel, generating: status === 'loading' }
 }
