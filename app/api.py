@@ -23,8 +23,11 @@ from app.schemas import (
     ErrorDetail,
     HealthResponse,
     ImageInfo,
+    RefineEventData,
+    RefineResultPayload,
     ResultPayload,
     SanitizeCounts,
+    SimilarityInfo,
     StatusData,
     UsageInfo,
     sse,
@@ -36,6 +39,7 @@ from src.core.palette import extract_palette
 from src.core.prompts import build_messages
 from src.generator.html_cleaner import clean_model_output
 from src.generator.sanitize import make_standalone
+from src.refine.service import RefineService
 
 log = logging.getLogger("visioncraft")
 
@@ -89,7 +93,7 @@ class GuardMiddleware(BaseHTTPMiddleware):
             if not secrets.compare_digest(presented, settings.app_access_key):
                 return guard_response(401, {"detail": error("ACCESS_DENIED", "Enter the access key.").to_dict()})
 
-        if path == "/api/generate" and request.method == "POST":
+        if path in {"/api/generate", "/api/refine"} and request.method == "POST":
             retry_after = check_rate_limit(request)
             if retry_after is not None:
                 return guard_response(
@@ -135,13 +139,18 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.vlm_client = VLMClient()
+        app.state.refine_service = RefineService()
         yield
+        if app.state.refine_service is not None:
+            await app.state.refine_service.aclose()
         await app.state.vlm_client.aclose()
 
     app = FastAPI(title="VisionCraft", version="1.0.0", lifespan=lifespan)
     app.state.rate_hits = {}
     app.state.client_factory = None
+    app.state.refine_factory = None
     app.state.vlm_client = None
+    app.state.refine_service = None
 
     settings = get_settings()
     app.add_middleware(
@@ -171,6 +180,7 @@ def create_app() -> FastAPI:
             accepted_types=["image/png", "image/jpeg", "image/webp"],
             requires_access_key=bool(s.app_access_key),
             model=s.hf_model_id,
+            refine_enabled=s.enable_refine_loop,
         )
 
     @app.post("/api/generate")
@@ -198,6 +208,39 @@ def create_app() -> FastAPI:
             return JSONResponse({"detail": _public_detail(exc)}, status_code=exc.http_status)
         return JSONResponse(result.model_dump(mode="json", exclude_none=True))
 
+    @app.post("/api/refine")
+    async def refine(
+        request: Request,
+        image: UploadFile = File(...),
+        html: str = Form(...),
+        instructions: str = Form(default=""),
+        stream: bool = Form(default=True),
+    ):
+        settings = get_settings()
+        if not settings.enable_refine_loop:
+            exc = error("REFINE_DISABLED", "Visual refinement is disabled. Set ENABLE_REFINE_LOOP=true.")
+            return JSONResponse({"detail": _public_detail(exc)}, status_code=exc.http_status)
+        raw = await image.read()
+        if stream:
+            return _refine_streaming_response(
+                request,
+                raw,
+                html,
+                instructions,
+                timeout_seconds=settings.refine_timeout_seconds,
+            )
+        try:
+            result = await asyncio.wait_for(
+                _run_refine(request, raw, html, instructions, on_event=None),
+                timeout=settings.refine_timeout_seconds,
+            )
+        except (asyncio.TimeoutError, TimeoutError):
+            exc = error("REFINE_FAILED", "Refinement took too long. Try again or simplify the page.")
+            return JSONResponse({"detail": _public_detail(exc)}, status_code=exc.http_status)
+        except VisionCraftError as exc:
+            return JSONResponse({"detail": _public_detail(exc)}, status_code=exc.http_status)
+        return JSONResponse(result.model_dump(mode="json", exclude_none=True))
+
     # React frontend (frontend/dist) takes precedence; legacy vanilla web/ is the fallback.
     dist_dir = settings_module.ROOT / "frontend" / "dist"
     web_dir = settings_module.ROOT / "web"
@@ -219,6 +262,92 @@ def _get_client(request: Request) -> VLMClient:
     if factory is not None:
         return factory()
     return request.app.state.vlm_client
+
+
+def _get_refine_service(request: Request) -> RefineService:
+    factory = request.app.state.refine_factory
+    if factory is not None:
+        return factory()
+    service = request.app.state.refine_service
+    if service is None:
+        raise error("REFINE_UNAVAILABLE", "The refinement service is not running.")
+    return service
+
+
+async def _run_refine(
+    request: Request,
+    raw: bytes,
+    html: str,
+    instructions: str,
+    on_event: Callable[[StreamEvent], None] | None,
+    on_refine: Callable[[dict], None] | None = None,
+) -> RefineResultPayload:
+    settings = get_settings()
+    if not settings.enable_refine_loop:
+        raise error("REFINE_DISABLED", "Visual refinement is disabled. Set ENABLE_REFINE_LOOP=true.")
+    if not (settings.hf_token or settings.groq_api_key or settings.google_api_key):
+        raise error("AUTH_MISSING", "Configure at least one provider: HF_TOKEN, GROQ_API_KEY, or GOOGLE_API_KEY.")
+
+    if on_event:
+        on_event(StreamEvent(kind="status", text="preparing"))
+    prepared = prepare_image(
+        raw,
+        max_side=settings.image_max_side,
+        max_upload_bytes=settings.max_upload_mb * 1024 * 1024,
+        max_payload_kb=settings.max_image_payload_kb,
+    )
+    client = _get_client(request)
+    service = _get_refine_service(request)
+
+    def status(stage: str) -> None:
+        if on_event:
+            on_event(StreamEvent(kind="status", text=stage))
+
+    def refined(data: dict) -> None:
+        if on_refine:
+            on_refine(data)
+
+    try:
+        outcome = await service.refine(
+            html=html,
+            prepared=prepared,
+            instructions=instructions,
+            client=client,
+            on_status=status,
+            on_refine=refined,
+            is_disconnected=request.is_disconnected,
+        )
+    except VisionCraftError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - typed API failure for an unexpected refine error
+        log.error(
+            "Unhandled refine error (request %s): %s",
+            getattr(request.state, "request_id", "?"),
+            _redact(str(exc))[:200],
+        )
+        raise error("REFINE_FAILED", "Refinement failed unexpectedly.") from exc
+
+    warnings = list(prepared.warnings) + list(outcome.warnings)
+    return RefineResultPayload(
+        html=outcome.html,
+        similarity=SimilarityInfo(
+            initial=outcome.initial,
+            candidate=outcome.candidate,
+            final=outcome.final,
+            kept=outcome.kept,
+            improvement=outcome.improvement,
+            meaningful=outcome.meaningful,
+            target=outcome.target,
+        ),
+        warnings=warnings,
+        model=outcome.model,
+        provider=outcome.provider,
+        finish_reason=outcome.finish_reason,
+        truncated=outcome.truncated,
+        sanitize=SanitizeCounts(**{k: v for k, v in asdict(outcome.sanitize).items() if k != "notes"}),
+        usage=UsageInfo(**outcome.usage) if outcome.usage else None,
+        elapsed_ms=outcome.elapsed_ms,
+    )
 
 
 async def _run_pipeline(
@@ -334,6 +463,90 @@ def _streaming_response(request: Request, raw: bytes, instructions: str, timeout
         except Exception as exc:  # noqa: BLE001 - never leave an SSE stream hanging
             log.error("Unhandled error in /api/generate (request %s): %s",
                       getattr(request.state, "request_id", "?"), _redact(str(exc))[:200])
+            queue.put_nowait(sse("error", ErrorDetail(**error("INTERNAL", "Unexpected error; request id shown.").to_dict())))
+        finally:
+            queue.put_nowait(None)
+
+    async def consume() -> AsyncIterator[str]:
+        producer = asyncio.create_task(produce())
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=SSE_PING_SECONDS)
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+                    continue
+                if item is None:
+                    return
+                yield item
+        finally:
+            if not producer.done():
+                producer.cancel()
+
+    return StreamingResponse(
+        consume(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def _refine_streaming_response(
+    request: Request,
+    raw: bytes,
+    html: str,
+    instructions: str,
+    timeout_seconds: float,
+) -> StreamingResponse:
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def produce():
+        allowed_stages = {
+            "preparing",
+            "rendering",
+            "scoring",
+            "refining",
+            "calling_model",
+            "generating",
+            "postprocessing",
+        }
+
+        def emit(client_event: StreamEvent):
+            if client_event.kind == "status":
+                text = client_event.text if client_event.text in allowed_stages else "preparing"
+                queue.put_nowait(
+                    sse(
+                        "status",
+                        StatusData(
+                            stage=text,
+                            note=client_event.note or None,
+                            model=client_event.model or None,
+                            provider=client_event.provider or None,
+                        ),
+                    )
+                )
+
+        def emit_refine(data: dict):
+            queue.put_nowait(sse("refine", RefineEventData(**data)))
+
+        try:
+            result = await asyncio.wait_for(
+                _run_refine(request, raw, html, instructions, on_event=emit, on_refine=emit_refine),
+                timeout=timeout_seconds,
+            )
+            queue.put_nowait(sse("result", result))
+        except VisionCraftError as exc:
+            queue.put_nowait(sse("error", ErrorDetail(**_public_detail(exc))))
+        except (asyncio.TimeoutError, TimeoutError):
+            exc = error("REFINE_FAILED", "Refinement took too long. Try again or simplify the page.")
+            queue.put_nowait(sse("error", ErrorDetail(**_public_detail(exc))))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - never leave an SSE stream hanging
+            log.error(
+                "Unhandled error in /api/refine (request %s): %s",
+                getattr(request.state, "request_id", "?"),
+                _redact(str(exc))[:200],
+            )
             queue.put_nowait(sse("error", ErrorDetail(**error("INTERNAL", "Unexpected error; request id shown.").to_dict())))
         finally:
             queue.put_nowait(None)

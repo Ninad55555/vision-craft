@@ -86,6 +86,8 @@ def make_settings(**overrides) -> Settings:
         "hf_base_url": "http://localhost:9/v1",
         "hf_model_id": "primary-model",
         "hf_fallback_model_ids": "fallback-a,fallback-b",
+        "groq_api_key": "",
+        "google_api_key": "",
         "max_retries": 2,
         "max_output_tokens": 100,
         "request_timeout_seconds": 5,

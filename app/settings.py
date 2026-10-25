@@ -36,7 +36,11 @@ class Settings(BaseSettings):
     trust_proxy: bool = False
 
     enable_refine_loop: bool = False
-    refine_max_iterations: int = 2
+    refine_target_score: float = 0.90
+    refine_min_improvement: float = 0.01
+    refine_render_timeout_seconds: float = 20
+    refine_timeout_seconds: float = 360
+    refine_browser_channel: str = ""
 
     @property
     def fallback_models(self) -> list[str]:
