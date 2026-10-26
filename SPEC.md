@@ -114,7 +114,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     enable_refine_loop: bool = False                     # P1
-    refine_max_iterations: int = 2                       # P1
+    refine_target_score: float = 0.90                    # P1
+    refine_min_improvement: float = 0.01                 # P1 (labels meaningful gains)
+    refine_render_timeout_seconds: float = 20            # P1
+    refine_timeout_seconds: float = 360                  # P1
+    refine_browser_channel: str = ""                     # P1 (empty auto-detects)
 
     @property
     def fallback_models(self) -> list[str]:
@@ -481,18 +485,18 @@ Manual checklist (M2/M3), on the 15-image set (PRD §9): record per image — va
 ## 12. P1 / P2 specifications
 
 ### P1 — Compare tab (F20)
-Original and preview stacked in one container; range input sets the preview layer's opacity 0–100%; same sandbox rules; both scaled to the original's aspect ratio.
+Original and preview stacked in one container; range input sets the preview layer's opacity 0–100%; same sandbox rules; both share the same preview stage.
 
-### P1 — Self-refine loop (F21), `src/refine/`
-Enabled by `ENABLE_REFINE_LOOP=true`; requires `requirements-refine.txt` + `playwright install chromium`.
-1. `render.py`: Playwright Chromium, viewport = prepared image width × height, `javascript_enabled=True`, **route-block all network** (`page.route("**/*", abort)` except `data:`), `set_content(html)`, wait for `load` + 300 ms, full-page screenshot → PIL. Count blocked requests (should be 0).
+### P1 — Visual refinement (F21), `src/refine/`
+Manual one pass per click; enabled by `ENABLE_REFINE_LOOP=true`; requires `requirements-refine.txt` + `playwright install chromium` (Edge/Chrome auto-fallback when installed).
+1. `render.py`: Playwright Chromium, viewport = prepared image width × height, `javascript_enabled=True`, **route-block all network** (`page.route("**/*", abort)` except `data:`), `set_content(html)`, wait for `load` + 300 ms, viewport screenshot → PIL. Count blocked requests.
 2. `similarity.py`: resize the render to the original's size; compute SSIM on grayscale (`skimage.metrics.structural_similarity`); return `score` ∈ [0,1].
-3. `loop.py`: if `score < 0.9` and iterations < `REFINE_MAX_ITERATIONS`: send **three** inputs — original screenshot, current render, current HTML — with `prompts/refine.md` ("Image 1 is the target, image 2 is your current render. List the most visible differences (layout, spacing, colors, missing elements, text), then output the full corrected HTML in one ```html fence. Do not remove content to simplify."). Keep the best-scoring version; stop if the score does not improve by ≥ 0.01. Always run the sanitizer on each iteration's output.
-4. SSE adds `event: refine` `{iteration, score, kept: bool}`; `result` gains `"similarity": {"initial": 0.52, "final": 0.64, "iterations": 2}`.
-5. Cost warning in UI/README: each iteration roughly doubles the prompt (two images + HTML) and repeats a full output. Do not enable on a free-tier account.
+3. `service.py`: if `score >= REFINE_TARGET_SCORE`, skip the VLM. Otherwise send **three** inputs — original screenshot, current render, current HTML — with `prompts/refine.md` ("Image 1 is the target, image 2 is your current render. List the most visible differences (layout, spacing, colors, missing elements, text), then output the full corrected HTML in one ```html fence. Do not remove content to simplify."). Make exactly one correction call; keep the candidate only if it scores higher. `REFINE_MIN_IMPROVEMENT` only labels meaningful gains. Always run the sanitizer on model output.
+4. SSE adds `event: refine` `{initial, candidate, final, kept, improvement, meaningful, target}`; `result` gains `"similarity": {"initial": 0.52, "final": 0.64, "kept": true, ...}`.
+5. Cost warning in UI/README: each click roughly doubles the prompt (two images + HTML) and repeats a full output. Do not enable on a free-tier account.
 
 ### P2 — Eval harness (F30)
-`scripts/eval.py --dir tests/eval_images --out docs/RESULTS.md`: for each image call the pipeline in-process, render with Playwright, record: valid-HTML flag, SSIM, blocked-request count, visible-text token recall (tokens from DOM `innerText` vs. a manually supplied `<image>.txt` ground-truth file), latency, token usage. Output a Markdown table plus median/p90.
+`scripts/eval.py --images-dir tests/eval_images --out-json docs/refine_results.json`: for each image call the running API, optionally refine, and record: valid-HTML flag, SSIM, blocked-request count, visible-text token recall (tokens from DOM `innerText` vs. a manually supplied `<image>.txt` ground-truth file), latency, token usage. Output a Markdown table plus median/p90.
 
 ## 13. Definition of Done (v1.0)
 

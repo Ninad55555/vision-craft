@@ -1,4 +1,4 @@
-import type { BackendConfig, GenerationResult, StatusEvent } from '../types'
+import type { BackendConfig, GenerationResult, RefineEvent, RefineResult, StatusEvent } from '../types'
 
 // Centralized backend base URL. Empty = same origin (FastAPI serves dist).
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined ?? '').replace(/\/$/, '')
@@ -23,10 +23,19 @@ export async function getConfig(): Promise<BackendConfig> {
   return res.json()
 }
 
-export interface GenerateCallbacks {
+interface StreamCallbacks {
   signal: AbortSignal
   onStatus: (s: StatusEvent) => void
+  onDelta?: (chars: number) => void
+  onRefine?: (event: RefineEvent) => void
+}
+
+export interface GenerateCallbacks extends StreamCallbacks {
   onDelta: (chars: number) => void
+}
+
+export interface RefineCallbacks extends StreamCallbacks {
+  onRefine: (event: RefineEvent) => void
 }
 
 function parseErrorCode(payload: unknown): string | null {
@@ -37,18 +46,8 @@ function parseErrorCode(payload: unknown): string | null {
   return null
 }
 
-/** POST /api/generate with stream=true (existing contract). Resolves with the `result` SSE payload. */
-export async function generateUI(
-  image: File,
-  instructions: string,
-  cb: GenerateCallbacks,
-): Promise<GenerationResult> {
-  const form = new FormData()
-  form.append('image', image, image.name || 'screenshot.png')
-  form.append('instructions', instructions)
-  form.append('stream', 'true')
-
-  const response = await fetch(url('/api/generate'), {
+async function streamForm<T>(path: string, form: FormData, cb: StreamCallbacks): Promise<T> {
+  const response = await fetch(url(path), {
     method: 'POST',
     body: form,
     headers: accessHeaders(),
@@ -86,10 +85,39 @@ export async function generateUI(
       if (!name) continue
       const payload = data ? JSON.parse(data) : null
       if (name === 'status') cb.onStatus(payload as StatusEvent)
-      else if (name === 'delta') cb.onDelta((payload?.text ?? '').length)
-      else if (name === 'result') return payload as GenerationResult
+      else if (name === 'delta') cb.onDelta?.((payload?.text ?? '').length)
+      else if (name === 'refine') cb.onRefine?.(payload as RefineEvent)
+      else if (name === 'result') return payload as T
       else if (name === 'error') throw Object.assign(new Error(payload?.code ?? 'UPSTREAM_ERROR'), { code: payload?.code })
     }
   }
   throw Object.assign(new Error('INTERNAL'), { code: 'INTERNAL' })
+}
+
+/** POST /api/generate with stream=true. Resolves with the `result` SSE payload. */
+export async function generateUI(
+  image: File,
+  instructions: string,
+  cb: GenerateCallbacks,
+): Promise<GenerationResult> {
+  const form = new FormData()
+  form.append('image', image, image.name || 'screenshot.png')
+  form.append('instructions', instructions)
+  form.append('stream', 'true')
+  return streamForm<GenerationResult>('/api/generate', form, cb)
+}
+
+/** POST /api/refine. Runs exactly one render -> score -> correction pass. */
+export async function refineUI(
+  image: File,
+  html: string,
+  instructions: string,
+  cb: RefineCallbacks,
+): Promise<RefineResult> {
+  const form = new FormData()
+  form.append('image', image, image.name || 'screenshot.png')
+  form.append('html', html)
+  form.append('instructions', instructions)
+  form.append('stream', 'true')
+  return streamForm<RefineResult>('/api/refine', form, cb)
 }

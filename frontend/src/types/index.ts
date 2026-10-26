@@ -8,6 +8,7 @@ export interface BackendConfig {
   accepted_types: string[]
   requires_access_key: boolean
   model: string
+  refine_enabled: boolean
 }
 
 export interface GenerationResult {
@@ -27,8 +28,39 @@ export interface ApiErrorShape {
 }
 
 export interface StatusEvent {
-  stage: 'preparing' | 'calling_model' | 'generating' | 'postprocessing'
+  stage: 'preparing' | 'calling_model' | 'generating' | 'postprocessing' | 'rendering' | 'scoring' | 'refining'
   note?: string | null
   model?: string | null
   provider?: string | null
+}
+
+export interface SimilarityInfo {
+  initial: number
+  candidate: number
+  final: number
+  kept: boolean
+  improvement: number
+  meaningful: boolean
+  target: number
+}
+
+export interface RefineEvent {
+  initial: number
+  candidate: number
+  final: number
+  kept: boolean
+  improvement: number
+  meaningful: boolean
+}
+
+export interface RefineResult {
+  html: string
+  similarity: SimilarityInfo
+  warnings: string[]
+  model?: string | null
+  provider?: string | null
+  finish_reason?: string | null
+  truncated: boolean
+  usage?: { prompt_tokens?: number; completion_tokens?: number } | null
+  elapsed_ms: number
 }
