@@ -35,6 +35,10 @@ ERROR_TABLE: dict[str, tuple[int, bool]] = {
     "UPSTREAM_TIMEOUT": (504, True),
     "UPSTREAM_ERROR": (502, True),
     "OUTPUT_NOT_HTML": (502, True),
+    "REFINE_DISABLED": (403, False),
+    "REFINE_UNAVAILABLE": (503, False),
+    "REFINE_FAILED": (502, True),
+    "INVALID_HTML": (400, False),
     "INTERNAL": (500, False),
 }
 

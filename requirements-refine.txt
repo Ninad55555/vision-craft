@@ -1,0 +1,6 @@
+# Optional dependencies for visual refinement (POST /api/refine).
+# The base app and test suite do not need these; endpoints return
+# REFINE_UNAVAILABLE until they are installed.
+playwright>=1.48
+scikit-image>=0.24
+numpy>=2.0

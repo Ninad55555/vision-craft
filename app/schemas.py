@@ -19,6 +19,7 @@ class ConfigResponse(BaseModel):
     accepted_types: list[str]
     requires_access_key: bool
     model: str
+    refine_enabled: bool = False
 
 
 class SanitizeCounts(BaseModel):
@@ -56,6 +57,38 @@ class ResultPayload(BaseModel):
     elapsed_ms: int = 0
 
 
+class SimilarityInfo(BaseModel):
+    initial: float
+    candidate: float
+    final: float
+    kept: bool
+    improvement: float
+    meaningful: bool
+    target: float
+
+
+class RefineEventData(BaseModel):
+    initial: float
+    candidate: float
+    final: float
+    kept: bool
+    improvement: float
+    meaningful: bool
+
+
+class RefineResultPayload(BaseModel):
+    html: str
+    similarity: SimilarityInfo
+    warnings: list[str] = Field(default_factory=list)
+    model: Optional[str] = None
+    provider: Optional[str] = None
+    finish_reason: Optional[str] = None
+    truncated: bool = False
+    sanitize: SanitizeCounts
+    usage: Optional[UsageInfo] = None
+    elapsed_ms: int = 0
+
+
 class ErrorDetail(BaseModel):
     code: str
     message: str
@@ -67,7 +100,15 @@ class ErrorBody(BaseModel):
 
 
 class StatusData(BaseModel):
-    stage: Literal["preparing", "calling_model", "generating", "postprocessing"]
+    stage: Literal[
+        "preparing",
+        "calling_model",
+        "generating",
+        "postprocessing",
+        "rendering",
+        "scoring",
+        "refining",
+    ]
     note: Optional[str] = None
     model: Optional[str] = None
     provider: Optional[str] = None

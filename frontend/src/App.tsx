@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CodeEditor from './components/CodeEditor/CodeEditor'
 import CompareView from './components/CompareView'
 import EmptyState from './components/EmptyState'
@@ -11,11 +11,13 @@ import PreviewToolbar from './components/PreviewToolbar'
 import ScreenshotUploader from './components/ScreenshotUploader'
 import { useDebounce } from './hooks/useDebounce'
 import { useGeneration } from './hooks/useGeneration'
+import { useRefine } from './hooks/useRefine'
 import { getConfig } from './services/api'
 import type { ActiveTab, BackendConfig, PreviewMode } from './types'
 import { normalizeHtml } from './utils/html'
 
 const MAX_INSTRUCTIONS = 1000
+const pct = (value: number) => `${Math.round(value * 100)}%`
 
 function StudioPage({ onHome }: { onHome: () => void }) {
   const [config, setConfig] = useState<BackendConfig | null>(null)
@@ -30,7 +32,9 @@ function StudioPage({ onHome }: { onHome: () => void }) {
   const [copied, setCopied] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [previewLoaded, setPreviewLoaded] = useState(false)
+  const pendingFile = useRef<File | null>(null)
   const gen = useGeneration()
+  const refine = useRefine()
 
   useEffect(() => {
     getConfig().then(setConfig).catch((e: Error) => setConfigError(`Could not reach the server (${e.message}). Is it running?`))
@@ -53,20 +57,39 @@ function StudioPage({ onHome }: { onHome: () => void }) {
   useEffect(() => {
     if (gen.result) {
       setGeneratedCode(gen.result.html)
-      setGeneratedFrom(file)
+      setGeneratedFrom(pendingFile.current)
     }
-  }, [gen.result, file])
+  }, [gen.result])
 
   const canCompare = !!file && file === generatedFrom && !!previewDocument
+  const canRefine = !!config?.refine_enabled && !!file && file === generatedFrom && !!generatedCode && !gen.generating && !refine.refining
 
   useEffect(() => {
     if (!canCompare && tab === 'compare') setTab('preview')
   }, [canCompare, tab])
 
   const start = () => {
-    if (!file || gen.generating) return
+    if (!file || gen.generating || refine.refining) return
+    pendingFile.current = file
+    setGeneratedFrom(null)
     setTab('preview')
+    refine.reset()
     void gen.start(file, instructions)
+  }
+
+  const startRefine = async () => {
+    if (!file || !generatedCode || !canRefine) return
+    const r = await refine.start(file, generatedCode, instructions)
+    if (r) {
+      setGeneratedCode(r.html)
+      setGeneratedFrom(file)
+      setTab('compare')
+    }
+  }
+
+  const onCodeChange = (value: string) => {
+    setGeneratedCode(value)
+    refine.reset()
   }
 
   const copy = async () => {
@@ -140,7 +163,12 @@ function StudioPage({ onHome }: { onHome: () => void }) {
             <ScreenshotUploader
               config={config}
               file={file}
-              onFile={(f, err) => { setFile(f); setFileError(err ?? null) }}
+              onFile={(f, err) => {
+                setFile(f)
+                setFileError(err ?? null)
+                setGeneratedFrom(null)
+                refine.reset()
+              }}
             />
             {fileError && <p className="field-error" role="alert">{fileError}</p>}
             {configError && (
@@ -172,7 +200,7 @@ function StudioPage({ onHome }: { onHome: () => void }) {
           <div className="step">
             <p className="step-label"><span className="step-num" aria-hidden="true">3</span> Generate</p>
             <div className="actions">
-              <button type="button" className="btn primary btn-block" disabled={!file || gen.generating} onClick={start}>
+              <button type="button" className="btn primary btn-block" disabled={!file || gen.generating || refine.refining} onClick={start}>
                 <Icon name="spark" size={16} />
                 {gen.generating ? 'Generating…' : 'Generate'}
               </button>
@@ -205,9 +233,23 @@ function StudioPage({ onHome }: { onHome: () => void }) {
               <Icon name="download" size={15} />
               Download
             </button>
-            <button type="button" className="btn" disabled={!file || gen.generating} onClick={start}>
+            <button type="button" className="btn" disabled={!file || gen.generating || refine.refining} onClick={start}>
               <Icon name="refresh" size={15} />
               Regenerate
+            </button>
+            <button
+              type="button"
+              className="btn refine-btn"
+              disabled={!canRefine}
+              onClick={() => void startRefine()}
+              title={!config?.refine_enabled
+                ? 'Visual refinement is disabled on this server'
+                : !canCompare
+                  ? 'Generate output for the current screenshot first'
+                  : 'Render this HTML, compare it with the screenshot, and run one correction pass'}
+            >
+              <Icon name="spark" size={15} />
+              {refine.refining ? 'Refining…' : refine.result ? 'Refine again' : 'Refine match'}
             </button>
             <button
               type="button"
@@ -221,9 +263,40 @@ function StudioPage({ onHome }: { onHome: () => void }) {
             </button>
           </div>
 
-          {gen.result?.warnings?.length ? (
+          {refine.refining && (
+            <div className="refine-progress" aria-live="polite">
+              <span className="refine-spinner" aria-hidden="true" />
+              <span className="refine-progress-label">{refine.stage}</span>
+              <span className="refine-progress-meta">{refine.elapsed.toFixed(1)} s</span>
+              {refine.live && <span className="refine-progress-meta">SSIM {pct(refine.live.final)}</span>}
+              <button type="button" className="link-btn" onClick={refine.cancel}>Cancel</button>
+            </div>
+          )}
+
+          {refine.result && !refine.refining && (
+            <div className={`refine-summary${refine.result.similarity.final >= refine.result.similarity.target ? ' is-target' : ''}`} role="status">
+              <span className="score-chip" title="Structural similarity between the screenshot and the rendered HTML">
+                SSIM {pct(refine.result.similarity.final)}
+              </span>
+              <span className="refine-summary-text">
+                {refine.result.similarity.kept
+                  ? refine.result.similarity.improvement < 0.01
+                    ? 'Improved slightly; the new HTML was kept.'
+                    : `Improved ${Math.round(refine.result.similarity.improvement * 100)} points.`
+                  : refine.result.similarity.final >= refine.result.similarity.target
+                    ? 'Target already met; no model call was made.'
+                    : 'The correction did not beat the current render; the previous HTML was kept.'}
+              </span>
+              <span className="refine-target">target {pct(refine.result.similarity.target)}</span>
+              <span className="refine-target">{(refine.result.elapsed_ms / 1000).toFixed(1)} s</span>
+            </div>
+          )}
+
+          {refine.error && <ErrorState message={refine.error} onRetry={canRefine ? () => void startRefine() : undefined} />}
+
+          {(refine.result ? refine.result.warnings : gen.result?.warnings)?.length ? (
             <div className="warnings" role="note">
-              {gen.result.warnings.map((w, i) => <p key={i}>{w}</p>)}
+              {(refine.result ? refine.result.warnings : gen.result?.warnings ?? []).map((w, i) => <p key={i}>{w}</p>)}
             </div>
           ) : null}
 
@@ -256,7 +329,7 @@ function StudioPage({ onHome }: { onHome: () => void }) {
           {tab === 'code' && (
             <div role="tabpanel" id="panel-code" aria-labelledby="tab-code">
               {generatedCode
-                ? <CodeEditor value={generatedCode} onChange={setGeneratedCode} />
+                ? <CodeEditor value={generatedCode} onChange={onCodeChange} />
                 : <EmptyState hint="Generate first — the HTML source will appear here for editing." />}
             </div>
           )}
@@ -268,6 +341,7 @@ function StudioPage({ onHome }: { onHome: () => void }) {
               mode={mode}
               reloadKey={reloadKey}
               onLoad={() => setPreviewLoaded(true)}
+              similarity={refine.result?.similarity ?? null}
             />
           )}
 

@@ -73,7 +73,7 @@ A student/indie developer/designer running the app **locally** with their own Hu
 | ID | Requirement |
 |----|-------------|
 | F20 | **Compare tab:** original vs. generated with an opacity-slider overlay. |
-| F21 | **Self-refine loop:** render output in headless Chromium, screenshot it, diff against the original (SSIM), send both images + current HTML back to the VLM for a correction pass; max `REFINE_MAX_ITERATIONS` (default 2); show the similarity score. |
+| F21 | **Manual visual refinement:** on click, render the current HTML in headless Chromium, screenshot it, diff against the original (SSIM), and make one VLM correction pass with both images + current HTML; keep the better candidate and show the similarity score. Each click is one independent pass. |
 | F22 | In-memory history of the last 5 generations in the session. |
 
 ### P2 — only if time remains

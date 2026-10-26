@@ -51,6 +51,8 @@ def make_settings(**overrides) -> Settings:
         "hf_token": "test-token",
         "hf_model_id": "test-model",
         "hf_fallback_model_ids": "",
+        "groq_api_key": "",
+        "google_api_key": "",
         "max_upload_mb": 10,
         "image_max_side": 1600,
         "max_image_payload_kb": 3000,

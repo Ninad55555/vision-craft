@@ -14,6 +14,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   UPSTREAM_TIMEOUT: 'The model took too long. Try a smaller screenshot.',
   UPSTREAM_ERROR: 'The model provider returned an error. Retry later.',
   OUTPUT_NOT_HTML: 'The model did not return an HTML document. Retry.',
+  REFINE_DISABLED: 'Visual refinement is disabled on this server.',
+  REFINE_UNAVAILABLE: 'Visual refinement is unavailable. Install Playwright and scikit-image on the server.',
+  REFINE_FAILED: 'Refinement failed. The current HTML was kept.',
+  INVALID_HTML: 'The current HTML is empty or invalid, so it cannot be refined.',
   INTERNAL: 'Unexpected server error. Check server logs.',
 }
 

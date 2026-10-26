@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { PreviewMode } from '../types'
+import type { PreviewMode, SimilarityInfo } from '../types'
 import Preview from './Preview'
 
 interface Props {
@@ -8,10 +8,14 @@ interface Props {
   mode: PreviewMode
   reloadKey: number
   onLoad: () => void
+  similarity?: SimilarityInfo | null
 }
 
-export default function CompareView({ file, document, mode, reloadKey, onLoad }: Props) {
+const pct = (value: number) => `${Math.round(value * 100)}%`
+
+export default function CompareView({ file, document, mode, reloadKey, onLoad, similarity }: Props) {
   const [imageUrl, setImageUrl] = useState('')
+  const [opacity, setOpacity] = useState(50)
 
   useEffect(() => {
     if (!file) { setImageUrl(''); return }
@@ -21,30 +25,52 @@ export default function CompareView({ file, document, mode, reloadKey, onLoad }:
   }, [file])
 
   return (
-    <div className="compare-grid" role="tabpanel" id="panel-compare" aria-labelledby="tab-compare">
-      <section className="compare-pane" aria-label="Original screenshot">
-        <header className="compare-pane-heading">
+    <div className="compare-overlay" role="tabpanel" id="panel-compare" aria-labelledby="tab-compare">
+      <header className="compare-overlay-bar">
+        <div className="compare-overlay-title">
           <span className="compare-index">A</span>
           <span><b>Original</b><small>{file?.name ?? 'Source screenshot'}</small></span>
-          {file && <span className="compare-dimensions">{(file.size / 1024).toFixed(0)} KB</span>}
-        </header>
-        <div className="compare-canvas source-canvas">
+          <span className="compare-swap">↔</span>
+          <span className="compare-index generated-index">B</span>
+          <span><b>Generated</b><small>Live HTML overlay</small></span>
+        </div>
+
+        {similarity && (
+          <div className={`compare-score${similarity.final >= similarity.target ? ' is-target' : ''}`} title="Structural similarity between the screenshot and the rendered HTML">
+            <span>SSIM <b>{pct(similarity.final)}</b></span>
+            <small>target {pct(similarity.target)}</small>
+            {similarity.kept
+              ? <span className={`compare-delta${similarity.meaningful ? ' is-meaningful' : ''}`}>{similarity.improvement < 0.01 ? 'small gain' : `+${Math.round(similarity.improvement * 100)} pts`}</span>
+              : <span className="compare-delta is-neutral">kept original</span>}
+          </div>
+        )}
+
+        <label className="compare-slider">
+          <span>Generated opacity</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={opacity}
+            onChange={(e) => setOpacity(Number(e.target.value))}
+            aria-label="Generated preview opacity"
+          />
+          <output>{opacity}%</output>
+        </label>
+      </header>
+
+      <div className="compare-stage">
+        <div className="compare-layer source-layer" aria-label="Original screenshot">
           {imageUrl
             ? <img src={imageUrl} alt="Original uploaded screenshot" />
             : <p>Upload a screenshot to compare it with the generated page.</p>}
         </div>
-      </section>
-
-      <section className="compare-pane" aria-label="Generated interface">
-        <header className="compare-pane-heading">
-          <span className="compare-index generated-index">B</span>
-          <span><b>Generated</b><small>Live HTML preview</small></span>
-          <span className="compare-live"><i /> LIVE</span>
-        </header>
-        <div className="compare-canvas generated-canvas">
+        <div className="compare-layer generated-layer" style={{ opacity: opacity / 100 }} aria-label="Generated interface">
           <Preview document={document} mode={mode} reloadKey={reloadKey} onLoad={onLoad} />
         </div>
-      </section>
+        <span className="compare-axis-label compare-axis-a">A</span>
+        <span className="compare-axis-label compare-axis-b">B</span>
+      </div>
     </div>
   )
 }
