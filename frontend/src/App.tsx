@@ -4,6 +4,7 @@ import CompareView from './components/CompareView'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
 import Icon from './components/Icon'
+import InstructionPresets from './components/InstructionPresets'
 import LandingPage from './components/LandingPage'
 import LoadingState from './components/LoadingState'
 import Preview from './components/Preview'
@@ -195,6 +196,7 @@ function StudioPage({ onHome }: { onHome: () => void }) {
               aria-describedby="instructions-count"
             />
             <p className="char-count" id="instructions-count">{instructions.length}/{MAX_INSTRUCTIONS}</p>
+            <InstructionPresets value={instructions} maxLength={MAX_INSTRUCTIONS} onChange={setInstructions} />
           </div>
 
           <div className="step">
