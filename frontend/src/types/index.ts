@@ -21,6 +21,14 @@ export interface GenerationResult {
   usage?: { prompt_tokens?: number; completion_tokens?: number } | null
 }
 
+export interface HistoryEntry {
+  id: string
+  createdAt: number
+  filename: string
+  instructions: string
+  result: GenerationResult
+}
+
 export interface ApiErrorShape {
   code: string
   message: string

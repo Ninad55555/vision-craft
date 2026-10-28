@@ -278,6 +278,39 @@ textarea:focus, input[type="password"]:focus {
   border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong);
 }
 .preset-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- recent drafts ---------- */
+.history-heading {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-2); margin-bottom: 8px;
+}
+.history-heading .step-label { margin-bottom: 0; }
+.history-heading .link-btn { min-height: 28px; font-size: 11px; }
+.history-empty { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.history-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.history-item { display: flex; align-items: stretch; gap: 6px; min-width: 0; }
+.history-restore {
+  display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0;
+  padding: 8px 9px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel-2); color: var(--ink); text-align: left;
+  font: inherit; cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.history-restore:hover:not(:disabled) { border-color: var(--accent); }
+.history-restore:disabled { opacity: 0.5; cursor: not-allowed; }
+.history-mark {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.history-copy { flex: 1; min-width: 0; }
+.history-copy b, .history-copy small {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.history-copy b { font-size: 12px; font-weight: 600; }
+.history-copy small { margin-top: 2px; color: var(--muted); font: 10px var(--font-mono); }
+.history-open { flex: 0 0 auto; color: var(--accent); font-size: 10.5px; font-weight: 650; }
+.history-remove { align-self: stretch; min-width: 36px; min-height: 0; }
 .link-btn {
   background: none; border: none; color: var(--accent);
   cursor: pointer; font-size: 13px; padding: 6px 2px; min-height: 32px;

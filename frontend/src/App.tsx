@@ -3,6 +3,7 @@ import CodeEditor from './components/CodeEditor/CodeEditor'
 import CompareView from './components/CompareView'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
+import HistoryPanel from './components/HistoryPanel'
 import Icon from './components/Icon'
 import InstructionPresets from './components/InstructionPresets'
 import LandingPage from './components/LandingPage'
@@ -12,9 +13,10 @@ import PreviewToolbar from './components/PreviewToolbar'
 import ScreenshotUploader from './components/ScreenshotUploader'
 import { useDebounce } from './hooks/useDebounce'
 import { useGeneration } from './hooks/useGeneration'
+import { useHistory } from './hooks/useHistory'
 import { useRefine } from './hooks/useRefine'
 import { getConfig } from './services/api'
-import type { ActiveTab, BackendConfig, PreviewMode } from './types'
+import type { ActiveTab, BackendConfig, GenerationResult, HistoryEntry, PreviewMode } from './types'
 import { normalizeHtml } from './utils/html'
 
 const MAX_INSTRUCTIONS = 1000
@@ -34,7 +36,15 @@ function StudioPage({ onHome }: { onHome: () => void }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [previewLoaded, setPreviewLoaded] = useState(false)
   const pendingFile = useRef<File | null>(null)
+  const pendingInstructions = useRef('')
+  const lastSaved = useRef<GenerationResult | null>(null)
   const gen = useGeneration()
+  const {
+    entries: historyEntries,
+    add: addHistory,
+    remove: removeHistory,
+    clear: clearHistory,
+  } = useHistory()
   const refine = useRefine()
 
   useEffect(() => {
@@ -62,6 +72,12 @@ function StudioPage({ onHome }: { onHome: () => void }) {
     }
   }, [gen.result])
 
+  useEffect(() => {
+    if (!gen.result || lastSaved.current === gen.result) return
+    lastSaved.current = gen.result
+    addHistory(pendingFile.current?.name ?? 'screenshot', pendingInstructions.current, gen.result)
+  }, [gen.result, addHistory])
+
   const canCompare = !!file && file === generatedFrom && !!previewDocument
   const canRefine = !!config?.refine_enabled && !!file && file === generatedFrom && !!generatedCode && !gen.generating && !refine.refining
 
@@ -72,6 +88,7 @@ function StudioPage({ onHome }: { onHome: () => void }) {
   const start = () => {
     if (!file || gen.generating || refine.refining) return
     pendingFile.current = file
+    pendingInstructions.current = instructions
     setGeneratedFrom(null)
     setTab('preview')
     refine.reset()
@@ -91,6 +108,19 @@ function StudioPage({ onHome }: { onHome: () => void }) {
   const onCodeChange = (value: string) => {
     setGeneratedCode(value)
     refine.reset()
+  }
+
+  const restoreDraft = (entry: HistoryEntry) => {
+    lastSaved.current = entry.result
+    pendingFile.current = null
+    pendingInstructions.current = entry.instructions
+    refine.reset()
+    setFile(null)
+    setFileError(null)
+    setGeneratedFrom(null)
+    setInstructions(entry.instructions)
+    setTab('preview')
+    gen.adopt(entry.result)
   }
 
   const copy = async () => {
@@ -221,6 +251,14 @@ function StudioPage({ onHome }: { onHome: () => void }) {
               </div>
             )}
           </div>
+
+          <HistoryPanel
+            entries={historyEntries}
+            disabled={gen.generating || refine.refining}
+            onRestore={restoreDraft}
+            onRemove={removeHistory}
+            onClear={clearHistory}
+          />
         </section>
 
         <section id="output" className="panel output-panel" aria-label="Generated output" aria-busy={gen.generating}>
