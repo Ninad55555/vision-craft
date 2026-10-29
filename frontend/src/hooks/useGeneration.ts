@@ -89,5 +89,29 @@ export function useGeneration() {
 
   const cancel = useCallback(() => aborter.current?.abort(), [])
 
-  return { status, stage, error, result, tokens, elapsed, activeProvider, activeModel, start, cancel, generating: status === 'loading' }
+  const adopt = useCallback((next: GenerationResult, label = 'Restored a recent draft from this browser.') => {
+    setTokens(0)
+    setError(null)
+    setResult(next)
+    setActiveProvider(next.provider ?? null)
+    setActiveModel(next.model)
+    setElapsed(next.elapsed_ms / 1000)
+    setStatus('success')
+    setStage(label)
+  }, [])
+
+  return {
+    status,
+    stage,
+    error,
+    result,
+    tokens,
+    elapsed,
+    activeProvider,
+    activeModel,
+    start,
+    cancel,
+    adopt,
+    generating: status === 'loading',
+  }
 }

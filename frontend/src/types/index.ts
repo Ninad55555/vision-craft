@@ -18,7 +18,16 @@ export interface GenerationResult {
   truncated: boolean
   warnings: string[]
   elapsed_ms: number
+  palette?: string[]
   usage?: { prompt_tokens?: number; completion_tokens?: number } | null
+}
+
+export interface HistoryEntry {
+  id: string
+  createdAt: number
+  filename: string
+  instructions: string
+  result: GenerationResult
 }
 
 export interface ApiErrorShape {
