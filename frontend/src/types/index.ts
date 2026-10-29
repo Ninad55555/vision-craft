@@ -18,6 +18,7 @@ export interface GenerationResult {
   truncated: boolean
   warnings: string[]
   elapsed_ms: number
+  palette?: string[]
   usage?: { prompt_tokens?: number; completion_tokens?: number } | null
 }
 

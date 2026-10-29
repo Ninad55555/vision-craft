@@ -480,6 +480,40 @@ textarea:focus, input[type="password"]:focus {
 }
 .meta-chip.warn { color: var(--warn-ink); border-color: var(--warn-line); background: var(--warn-bg); }
 
+/* ---------- source palette ---------- */
+.palette-panel {
+  margin-top: 12px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--panel-2); animation: rise 200ms ease;
+}
+.palette-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.palette-text { flex: 1; min-width: 180px; }
+.palette-title {
+  color: var(--ink-2); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.palette-hint { margin-top: 3px; color: var(--muted); font-size: 10.5px; }
+.palette-copy-btn { min-height: 34px; padding: 6px 11px; font-size: 11px; }
+.palette-swatches {
+  display: flex; flex-wrap: wrap; gap: 7px;
+  margin: 10px 0 0; padding: 0; list-style: none;
+}
+.swatch {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 34px; padding: 4px 9px 4px 5px;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--panel); color: var(--ink-2);
+  font: inherit; font-size: 10.5px; font-family: var(--font-mono); cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.swatch:hover { border-color: var(--accent); color: var(--ink); }
+.swatch-color {
+  width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.16);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2);
+}
+.swatch-hex { min-width: 48px; text-align: left; }
+
 /* ---------- footer ---------- */
 .app-footer {
   padding: var(--space-3) var(--space-6) var(--space-6);

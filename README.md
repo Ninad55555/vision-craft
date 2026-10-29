@@ -16,6 +16,8 @@ system fonts, and placeholder graphics. You will hand-edit the result.
   hero-only, system fonts) that add to or clear from your directions.
 - Recent drafts saved in your browser (last five generations, reopen or remove
   them without spending model credits).
+- Source palette from the screenshot, with one-click hex copy and a generated
+  CSS custom-properties block.
 - Optional **one-pass visual refinement**: render the current HTML, compare it
   with the screenshot using SSIM, and ask the model for one correction pass.
   Refinement only runs when you click the button; one click = one pass.

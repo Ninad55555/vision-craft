@@ -8,6 +8,7 @@ import Icon from './components/Icon'
 import InstructionPresets from './components/InstructionPresets'
 import LandingPage from './components/LandingPage'
 import LoadingState from './components/LoadingState'
+import PalettePanel from './components/PalettePanel'
 import Preview from './components/Preview'
 import PreviewToolbar from './components/PreviewToolbar'
 import ScreenshotUploader from './components/ScreenshotUploader'
@@ -17,6 +18,7 @@ import { useHistory } from './hooks/useHistory'
 import { useRefine } from './hooks/useRefine'
 import { getConfig } from './services/api'
 import type { ActiveTab, BackendConfig, GenerationResult, HistoryEntry, PreviewMode } from './types'
+import { copyText } from './utils/clipboard'
 import { normalizeHtml } from './utils/html'
 
 const MAX_INSTRUCTIONS = 1000
@@ -124,17 +126,7 @@ function StudioPage({ onHome }: { onHome: () => void }) {
   }
 
   const copy = async () => {
-    if (!generatedCode) return
-    try {
-      await navigator.clipboard.writeText(generatedCode)
-    } catch {
-      const area = document.createElement('textarea')
-      area.value = generatedCode
-      document.body.appendChild(area)
-      area.select()
-      document.execCommand('copy')
-      area.remove()
-    }
+    if (!generatedCode || !(await copyText(generatedCode))) return
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
@@ -399,6 +391,8 @@ function StudioPage({ onHome }: { onHome: () => void }) {
               {gen.result.truncated && <span className="meta-chip warn">truncated</span>}
             </div>
           )}
+
+          {gen.result?.palette?.length ? <PalettePanel colors={gen.result.palette} /> : null}
 
           {gen.error && <ErrorState message={gen.error} onRetry={file ? start : undefined} />}
         </section>
